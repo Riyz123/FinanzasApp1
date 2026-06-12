@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:ns1="urn:oasis:names:tc:xliff:document:1.2">
+    <string msgid="5976598919945601918" name="abc_action_bar_home_description">"پیمایش به صفحه اصلی"</string>
+    <string msgid="8388173803310557296" name="abc_action_bar_up_description">"رفتن به بالا"</string>
+    <string msgid="3937310113216875497" name="abc_action_menu_overflow_description">"گزینه‌های بیشتر"</string>
+    <string msgid="4692188335987374352" name="abc_action_mode_done">"تمام"</string>
+    <string msgid="1189761859438369441" name="abc_activity_chooser_view_see_all">"دیدن همه"</string>
+    <string msgid="2165779757652331008" name="abc_activitychooserview_choose_application">"انتخاب برنامه"</string>
+    <string msgid="4215997306490295099" name="abc_capital_off">"خاموش"</string>
+    <string msgid="884982626291842264" name="abc_capital_on">"روشن"</string>
+    <string msgid="8833365367933412986" name="abc_menu_alt_shortcut_label">"‎Alt+‎"</string>
+    <string msgid="2223301931652355242" name="abc_menu_ctrl_shortcut_label">"‎Ctrl+‎"</string>
+    <string msgid="838001238306846836" name="abc_menu_delete_shortcut_label">"حذف"</string>
+    <string msgid="7986526966204849475" name="abc_menu_enter_shortcut_label">"enter"</string>
+    <string msgid="375214403600139847" name="abc_menu_function_shortcut_label">"‎Function+‎"</string>
+    <string msgid="4192209724446364286" name="abc_menu_meta_shortcut_label">"‎Meta+‎"</string>
+    <string msgid="4741552369836443843" name="abc_menu_shift_shortcut_label">"‎Shift+‎"</string>
+    <string msgid="5473865519181928982" name="abc_menu_space_shortcut_label">"فاصله"</string>
+    <string msgid="6180552449598693998" name="abc_menu_sym_shortcut_label">"‎Sym+‎"</string>
+    <string msgid="5520303668377388990" name="abc_prepend_shortcut_label">"منو+"</string>
+    <string msgid="7208076849092622260" name="abc_search_hint">"جستجو…‏"</string>
+    <string msgid="3741173234950517107" name="abc_searchview_description_clear">"پاک کردن پُرسمان"</string>
+    <string msgid="693312494995508443" name="abc_searchview_description_query">"درخواست جستجو"</string>
+    <string msgid="3417662926640357176" name="abc_searchview_description_search">"جستجو"</string>
+    <string msgid="1486535517437947103" name="abc_searchview_description_submit">"ارسال پُرسمان"</string>
+    <string msgid="2293578557972875415" name="abc_searchview_description_voice">"جستجوی گفتاری"</string>
+    <string msgid="8875138169939072951" name="abc_shareactionprovider_share_with">"هم‌رسانی با"</string>
+    <string msgid="9055268688411532828" name="abc_shareactionprovider_share_with_application">"هم‌رسانی با <ns1:g id="APPLICATION_NAME">%s</ns1:g>"</string>
+    <string msgid="1656852541809559762" name="abc_toolbar_collapse_description">"کوچک کردن"</string>
+    <string msgid="8397015543330865059" name="android.credentials.TYPE_PASSWORD_CREDENTIAL">"گذرواژه"</string>
+    <string msgid="3929015085059320822" name="androidx.credentials.TYPE_PUBLIC_KEY_CREDENTIAL">"گذرکلید"</string>
+    <string msgid="8719607706653693137" name="androidx_compose_foundation_autofill">"تکمیل خودکار"</string>
+    <string msgid="1150566100598813236" name="androidx_compose_ui_autofill">"تکمیل خودکار"</string>
+    <string msgid="881409763997275156" name="call_notification_answer_action">"جواب"</string>
+    <string msgid="8793775615905189152" name="call_notification_answer_video_action">"ویدیو"</string>
+    <string msgid="3229508546291798546" name="call_notification_decline_action">"رد کردن"</string>
+    <string msgid="2659457946726154263" name="call_notification_hang_up_action">"قطع تماس"</string>
+    <string msgid="6107532579223922871" name="call_notification_incoming_text">"تماس ورودی"</string>
+    <string msgid="8623827134497363134" name="call_notification_ongoing_text">"تماس درحال انجام"</string>
+    <string msgid="59049573811482460" name="call_notification_screening_text">"درحال غربال کردن تماس ورودی"</string>
+    <string msgid="406453423630273620" name="close_drawer">"بستن منوی پیمایش"</string>
+    <string msgid="7573152094250666567" name="close_sheet">"بستن برگ"</string>
+    <string msgid="2523291102206661146" name="common_google_play_services_enable_button">فعال کردن</string>
+    <string msgid="227660514972886228" name="common_google_play_services_enable_text">‏تا وقتی «خدمات Google Play» را فعال نکنید، %1$s کار نمی‌کند.</string>
+    <string msgid="5122002158466380389" name="common_google_play_services_enable_title">‏‫فعال کردن «خدمات Google Play»</string>
+    <string msgid="7153882981874058840" name="common_google_play_services_install_button">نصب</string>
+    <string name="common_google_play_services_install_text">‏%1$s بدون خدمات Google Play که در دستگاه شما وجود ندارد اجرا نمی‌شود.</string>
+    <string msgid="7215213145546190223" name="common_google_play_services_install_title">‏دریافت «خدمات Google Play»</string>
+    <string name="common_google_play_services_notification_channel_name">‏دردسترس بودن خدمات Google Play</string>
+    <string name="common_google_play_services_notification_ticker">‏خطا در خدمات Google Play</string>
+    <string name="common_google_play_services_unknown_issue">‏%1$s برای استفاده از خدمات Google Play با مشکل روبرو است. لطفاً دوباره امتحان کنید.</string>
+    <string name="common_google_play_services_unsupported_text">‏%1$s بدون خدمات Google Play که در دستگاه شما پشتیبانی نمی‌شود، اجرا نخواهد شد.</string>
+    <string msgid="6556509956452265614" name="common_google_play_services_update_button">به‌روزرسانی</string>
+    <string msgid="9053896323427875356" name="common_google_play_services_update_text">‏تاز مانی که «خدمات Google Play» را به‌روزرسانی نکنید، %1$s اجرا نمی‌شود.</string>
+    <string msgid="6006316683626838685" name="common_google_play_services_update_title">‏‫به‌روزرسانی «خدمات Google Play»</string>
+    <string name="common_google_play_services_updating_text">‏%1$s بدون «خدمات Google Play» که درحال حاضر درحال به‌روزرسانی هستند، کار نمی‌کند.</string>
+    <string name="common_google_play_services_wear_update_text">‏نسخه جدید «خدمات Google Play» نیاز است. به‌زودی به‌طور خودکار به‌روزرسانی می‌شود.</string>
+    <string name="common_open_on_phone">باز کردن در تلفن</string>
+    <string name="common_signin_button_text">ورود به سیستم</string>
+    <string name="common_signin_button_text_long">‏ورود به سیستم با Google‎</string>
+    <string msgid="5912733858573823945" name="confirm_device_credential_password">"استفاده از گذرواژه"</string>
+    <string msgid="3260749812566568062" name="copy_toast_msg">"پیوند در بریده‌دان کپی شد"</string>
+    <string name="crop_image_menu_crop">بریدن (کراپ)</string>
+    <string msgid="8038256446254964252" name="default_error_message">"ورودی نامعتبر"</string>
+    <string msgid="4776854077120974966" name="default_error_msg">"خطای ناشناس"</string>
+    <string msgid="6312721426453364202" name="default_popup_window_title">"پنجره بالاپر"</string>
+    <string msgid="1890207353314751437" name="dropdown_menu">"منوی کرکره‌ای"</string>
+    <string msgid="4566929209979330987" name="fallback_menu_item_copy_link">"کپی پیوند"</string>
+    <string msgid="3413186855122069269" name="fallback_menu_item_open_in_browser">"بازکردن در مرورگر"</string>
+    <string msgid="7145444925855055364" name="fallback_menu_item_share_link">"هم‌رسانی پیوند"</string>
+    <string msgid="1072308044213194243" name="fingerprint_dialog_touch_sensor">"حسگر اثر انگشت را لمس کنید"</string>
+    <string msgid="8216738333501875566" name="fingerprint_error_hw_not_available">"سخت‌افزار اثر انگشت در دسترس نیست."</string>
+    <string msgid="6306988885793029438" name="fingerprint_error_hw_not_present">"این دستگاه حسگر اثر انگشت ندارد"</string>
+    <string msgid="7291787166416782245" name="fingerprint_error_lockout">"تعداد تلاش‌ها بیش از حد مجاز است. لطفاً بعداً دوباره امتحان کنید."</string>
+    <string msgid="7520712796891883488" name="fingerprint_error_no_fingerprints">"اثر انگشتی ثبت نشده است."</string>
+    <string msgid="7627716295344353987" name="fingerprint_error_user_canceled">"کاربر عملیات اثر انگشت را لغو کرد"</string>
+    <string msgid="3873359464293253009" name="fingerprint_not_recognized">"شناسایی نشد"</string>
+    <string msgid="3791785319221634505" name="generic_error_no_device_credential">"پین، الگو، یا گذرواژه‌ای تنظیم نشده است."</string>
+    <string msgid="1807436368654974044" name="generic_error_no_keyguard">"این دستگاه از پین، الگو، یا گذرواژه پشتیبانی نمی‌کند."</string>
+    <string msgid="7309881387583143581" name="generic_error_user_canceled">"کاربر اصالت‌سنجی را لغو کرد."</string>
+    <string name="ic_flip_24">آیینه کردن</string>
+    <string name="ic_flip_24_horizontally">آیینه کردن به صورت افقی</string>
+    <string name="ic_flip_24_vertically">آیینه کردن به صورت عمودی</string>
+    <string name="ic_rotate_left_24">چرخش در جهت عقربه های ساعت</string>
+    <string name="ic_rotate_right_24">چرخش</string>
+    <string msgid="6827826412747255547" name="in_progress">"درحال انجام"</string>
+    <string msgid="7933458017204019916" name="indeterminate">"ناقص علامت زده‌شده"</string>
+    <string msgid="2988463736136100848" name="m3c_bottom_sheet_collapse_description">"جمع کردن برگ زیرین"</string>
+    <string msgid="1555567894577437024" name="m3c_bottom_sheet_dismiss_description">"بستن برگ زیرین"</string>
+    <string msgid="8403354765404029791" name="m3c_bottom_sheet_drag_handle_description">"دستگیره کشاندن"</string>
+    <string msgid="6670819569745899763" name="m3c_bottom_sheet_expand_description">"ازهم باز کردن برگ زیرین"</string>
+    <string msgid="3010635850035863127" name="m3c_bottom_sheet_pane_title">"برگ زیرین"</string>
+    <string msgid="8166741421776570875" name="m3c_date_input_headline">"تاریخ واردشده"</string>
+    <string msgid="229313757840775812" name="m3c_date_input_headline_description">"‏تاریخ واردشده: %1$s"</string>
+    <string msgid="6116910750161463197" name="m3c_date_input_invalid_for_pattern">"‏تاریخ با الگوی موردانتظار مطابقت ندارد: %1$s"</string>
+    <string msgid="2521768508935305279" name="m3c_date_input_invalid_not_allowed">"‏تاریخ مجاز نیست: %1$s"</string>
+    <string msgid="7052898923934555305" name="m3c_date_input_invalid_year_range">"‏تاریخ خارج از بازه زمانی %1$s تا %2$s است"</string>
+    <string msgid="2895559812010326913" name="m3c_date_input_label">"تاریخ"</string>
+    <string msgid="1237013946323089826" name="m3c_date_input_no_input_description">"هیچ‌کدام"</string>
+    <string msgid="7306227249789210568" name="m3c_date_input_title">"انتخاب تاریخ"</string>
+    <string msgid="7605002211875882969" name="m3c_date_picker_headline">"تاریخ انتخابی"</string>
+    <string msgid="3664277305226978227" name="m3c_date_picker_headline_description">"‏انتخاب فعلی: %1$s"</string>
+    <string msgid="8436650776581492840" name="m3c_date_picker_navigate_to_year_description">"‏پیمایش به سال %1$s"</string>
+    <string msgid="5811000998184572395" name="m3c_date_picker_no_selection_description">"هیچ‌کدام"</string>
+    <string msgid="7813882352367152251" name="m3c_date_picker_scroll_to_earlier_years">"برای نمایش سال‌های قبل پیمایش کنید"</string>
+    <string msgid="5727367015496556177" name="m3c_date_picker_scroll_to_later_years">"برای نمایش سال‌های بعد پیمایش کنید"</string>
+    <string msgid="1804346892470238807" name="m3c_date_picker_switch_to_calendar_mode">"تعویض به حالت ورودی تقویم"</string>
+    <string msgid="395627960681594326" name="m3c_date_picker_switch_to_day_selection">"برای انتخاب سال، تند بکشید یا برای برگشتن به انتخاب روز، تک‌ضرب بزنید"</string>
+    <string msgid="2219746470065162704" name="m3c_date_picker_switch_to_input_mode">"رفتن به حالت ورودی نوشتاری"</string>
+    <string msgid="7142101321095356500" name="m3c_date_picker_switch_to_next_month">"تغییر به ماه بعدی"</string>
+    <string msgid="228438865139394590" name="m3c_date_picker_switch_to_previous_month">"تغییر به ماه قبلی"</string>
+    <string msgid="791651718641787594" name="m3c_date_picker_switch_to_year_selection">"رفتن به انتخاب سال"</string>
+    <string msgid="7430790972741451689" name="m3c_date_picker_title">"انتخاب تاریخ"</string>
+    <string msgid="3199387177749801575" name="m3c_date_picker_today_description">"امروز"</string>
+    <string msgid="2068382232816991922" name="m3c_date_picker_year_picker_pane_title">"انتخاب‌گر سال نمایان است"</string>
+    <string msgid="3190049423327661366" name="m3c_date_range_input_invalid_range_input">"محدوده تاریخ واردشده نامعتبر است"</string>
+    <string msgid="3148384720560189467" name="m3c_date_range_input_title">"تاریخ‌ها را وارد کنید"</string>
+    <string msgid="2138321128465719402" name="m3c_date_range_picker_day_in_range">"در محدوده"</string>
+    <string msgid="4947636797751277713" name="m3c_date_range_picker_end_headline">"تاریخ پایان"</string>
+    <string msgid="602077859540990149" name="m3c_date_range_picker_scroll_to_next_month">"برای نمایش ماه بعد پیمایش کنید"</string>
+    <string msgid="4592174524846109496" name="m3c_date_range_picker_scroll_to_previous_month">"برای نمایش ماه قبل پیمایش کنید"</string>
+    <string msgid="4665981448952749820" name="m3c_date_range_picker_start_headline">"تاریخ شروع"</string>
+    <string msgid="3134165431120340385" name="m3c_date_range_picker_title">"تاریخ‌ها را انتخاب کنید"</string>
+    <string msgid="7617233117134790350" name="m3c_dialog">"کادر گفتگو"</string>
+    <string msgid="3177828188723359358" name="m3c_dropdown_menu_collapsed">"جمع شد"</string>
+    <string msgid="2360841780724299882" name="m3c_dropdown_menu_expanded">"ازهم باز شد"</string>
+    <string msgid="8687821690726149911" name="m3c_dropdown_menu_toggle">"جمع کردن/ ازهم باز کردن منوِ کرکره‌ای"</string>
+    <string msgid="6072492480528318635" name="m3c_floating_toolbar_collapse">"جمع کردن نوارابزار"</string>
+    <string msgid="6880757017246780255" name="m3c_floating_toolbar_expand">"ازهم بازکردن نوارابزار"</string>
+    <string msgid="6152806324422087846" name="m3c_search_bar_search">"جستجو"</string>
+    <string msgid="6152755701819882931" name="m3c_snackbar_dismiss">"بستن"</string>
+    <string msgid="3868801555855510515" name="m3c_snackbar_pane_title">"هشدار"</string>
+    <string msgid="7655536806087401899" name="m3c_suggestions_available">"پیشنهادهای زیر"</string>
+    <string msgid="409352516511718051" name="m3c_time_input_dialog_title">"وارد کردن زمان"</string>
+    <string msgid="2786685010796619560" name="m3c_time_picker_am">"ق.ظ."</string>
+    <string msgid="7412665527536641863" name="m3c_time_picker_dialog_title">"انتخاب زمان"</string>
+    <string msgid="2349193472625211372" name="m3c_time_picker_hour">"ساعت"</string>
+    <string msgid="9179527532316922345" name="m3c_time_picker_hour_24h_suffix">"‏%1$d ساعت"</string>
+    <string msgid="8876759303332837035" name="m3c_time_picker_hour_selection">"انتخاب ساعت"</string>
+    <string msgid="3458167507790628988" name="m3c_time_picker_hour_suffix">"‏ساعت %1$d"</string>
+    <string msgid="6973808109666874069" name="m3c_time_picker_hour_text_field">"برای ساعت"</string>
+    <string msgid="4313071914266462005" name="m3c_time_picker_minute">"دقیقه"</string>
+    <string msgid="4699133535056739733" name="m3c_time_picker_minute_selection">"انتخاب دقیقه"</string>
+    <string msgid="5064177921781937179" name="m3c_time_picker_minute_suffix">"‏%1$d دقیقه"</string>
+    <string msgid="7661234488295443182" name="m3c_time_picker_minute_text_field">"برای دقیقه"</string>
+    <string msgid="5865171949528594571" name="m3c_time_picker_period_toggle_description">"انتخاب ق.ظ. یا ب.ظ."</string>
+    <string msgid="6616362054113087709" name="m3c_time_picker_pm">"ب.ظ."</string>
+    <string msgid="4145073906612931838" name="m3c_time_picker_toggle_keyboard">"برای ورودی زمان، به حالت ورودی نوشتاری بروید"</string>
+    <string msgid="8841786098195101324" name="m3c_time_picker_toggle_touch">"برای ورودی زمان، به حالت ساعت بروید"</string>
+    <string msgid="1805687647081129904" name="m3c_tooltip_long_press_label">"نمایش نکته‌ابزار"</string>
+    <string msgid="5460405025248574620" name="m3c_tooltip_pane_description">"نکته‌ابزار"</string>
+    <string msgid="6564222473543418073" name="m3c_wide_navigation_rail_close_rail">"بستن ریل"</string>
+    <string msgid="8350283435461615411" name="m3c_wide_navigation_rail_pane_title">"ریل پیمایش"</string>
+    <string msgid="8471891128988107974" name="mc2_snackbar_pane_title">"هشدار"</string>
+    <string msgid="542007171693138492" name="navigation_menu">"منوی پیمایش"</string>
+    <string msgid="6610465462668679431" name="not_selected">"انتخاب‌نشده"</string>
+    <string name="pick_image_camera">دوربین</string>
+    <string name="pick_image_chooser_title">منبع را انتخاب کنید</string>
+    <string name="pick_image_gallery">گالری</string>
+    <string msgid="5941395253238309765" name="range_end">"پایان محدوده"</string>
+    <string msgid="7097486360902471446" name="range_start">"شروع محدوده"</string>
+    <string msgid="6264217191555673260" name="search_menu_title">"جستجو"</string>
+    <string msgid="6043586758067023" name="selected">"انتخاب شد"</string>
+    <string msgid="2792228137354697160" name="snackbar_pane_title">"هشدار"</string>
+    <string msgid="4139871816613051306" name="state_empty">"خالی"</string>
+    <string msgid="5834637030682409883" name="state_off">"خاموش"</string>
+    <string msgid="1490883874751719580" name="state_on">"روشن"</string>
+    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
+    <string msgid="2561197295334830845" name="switch_role">"کلید"</string>
+    <string msgid="1672349317127674378" name="tab">"زبانه"</string>
+    <string msgid="5946805113151406391" name="template_percent">"<ns1:g id="PERCENTAGE">%1$d</ns1:g> درصد."</string>
+    <string msgid="3765533235322692011" name="tooltip_description">"نکته‌ابزار"</string>
+    <string msgid="3124740595719787496" name="tooltip_label">"نمایش نکته‌ابزار"</string>
+    <string name="ucrop_crop">برش</string>
+    <string name="ucrop_label_edit_photo">ویرایش عکس</string>
+    <string name="ucrop_label_original">اصلی</string>
+    <string name="ucrop_menu_crop">برش</string>
+    <string name="ucrop_rotate">چرخش</string>
+    <string name="ucrop_scale">اندازه</string>
+</resources>

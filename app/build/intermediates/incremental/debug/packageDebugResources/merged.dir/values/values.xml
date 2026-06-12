@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="white">#FFFFFFFF</color>
+    <string name="app_name">Proyecto_Finanzas_Personales</string>
+    <string name="gcm_defaultSenderId" translatable="false">129140821678</string>
+    <string name="google_api_key" translatable="false">AIzaSyDDuCKKR247XwcYu85bqBDFZIQPBaH98Z8</string>
+    <string name="google_app_id" translatable="false">1:129140821678:android:147700001fdb57add9e73f</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyDDuCKKR247XwcYu85bqBDFZIQPBaH98Z8</string>
+    <string name="google_storage_bucket" translatable="false">proyectofinanzaspersonal-1842a.firebasestorage.app</string>
+    <string name="project_id" translatable="false">proyectofinanzaspersonal-1842a</string>
+    <style name="Theme.Proyecto_Finanzas_Personales" parent="android:Theme.Material.Light.NoActionBar"/>
+</resources>
