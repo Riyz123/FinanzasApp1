@@ -45,7 +45,6 @@ import com.upn3.proyecto_finanzas_personales.ui.components.ThemeSelector
 import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
-import com.upn3.proyecto_finanzas_personales.utils.hasInternetConnection
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import android.widget.Toast

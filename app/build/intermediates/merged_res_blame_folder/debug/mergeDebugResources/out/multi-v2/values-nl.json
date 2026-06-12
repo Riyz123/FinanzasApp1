@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.upn3.proyecto_finanzas_personales.app-mergeDebugResources-65:/values-nl/values-nl.xml",
+            "outputFile": "com.upn3.proyecto_finanzas_personales.app-mergeDebugResources-64:/values-nl/values-nl.xml",
             "map": [
                 {
                     "source": "C:\\Users\\imano\\.gradle\\caches\\9.3.1\\transforms\\a99af46f27bc42c0bdf8344b7c8b404d\\workspace\\transformed\\play-services-basement-18.9.0\\res\\values-nl\\values.xml",

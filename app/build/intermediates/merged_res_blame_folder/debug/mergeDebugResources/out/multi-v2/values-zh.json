@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.upn3.proyecto_finanzas_personales.app-mergeDebugResources-65:/values-zh/values-zh.xml",
+            "outputFile": "com.upn3.proyecto_finanzas_personales.app-mergeDebugResources-64:/values-zh/values-zh.xml",
             "map": [
                 {
                     "source": "C:\\Users\\imano\\.gradle\\caches\\9.3.1\\transforms\\eb8f86b181ae1fe7f60b02c85c7dc25f\\workspace\\transformed\\ucrop-2.2.11\\res\\values-zh\\values-zh.xml",

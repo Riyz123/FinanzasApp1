@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.upn3.proyecto_finanzas_personales.app-mergeDebugResources-65:/values-zh-rCN/values-zh-rCN.xml",
+            "outputFile": "com.upn3.proyecto_finanzas_personales.app-mergeDebugResources-64:/values-zh-rCN/values-zh-rCN.xml",
             "map": [
                 {
                     "source": "C:\\Users\\imano\\.gradle\\caches\\9.3.1\\transforms\\e948b8e7ec14af628f7854d54d8235e3\\workspace\\transformed\\biometric-1.1.0\\res\\values-zh-rCN\\values-zh-rCN.xml",

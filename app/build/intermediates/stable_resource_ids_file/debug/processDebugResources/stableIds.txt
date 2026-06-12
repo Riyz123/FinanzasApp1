@@ -1,4 +1,3 @@
-com.upn3.proyecto_finanzas_personales:xml/rapid_response_client_defaults = 0x7f130004
 com.upn3.proyecto_finanzas_personales:xml/image_share_filepaths = 0x7f130003
 com.upn3.proyecto_finanzas_personales:xml/data_extraction_rules = 0x7f130002
 com.upn3.proyecto_finanzas_personales:xml/backup_rules = 0x7f130000
@@ -623,7 +622,6 @@ com.upn3.proyecto_finanzas_personales:id/ic_rotate_right_24 = 0x7f090088
 com.upn3.proyecto_finanzas_personales:id/ic_rotate_left_24 = 0x7f090087
 com.upn3.proyecto_finanzas_personales:attr/tickMark = 0x7f04015f
 com.upn3.proyecto_finanzas_personales:string/call_notification_ongoing_text = 0x7f100026
-com.upn3.proyecto_finanzas_personales:raw/translate_models_metadata = 0x7f0f0001
 com.upn3.proyecto_finanzas_personales:layout/select_dialog_singlechoice_material = 0x7f0c002c
 com.upn3.proyecto_finanzas_personales:id/ic_flip_24_vertically = 0x7f090086
 com.upn3.proyecto_finanzas_personales:id/ic_flip_24_horizontally = 0x7f090085
