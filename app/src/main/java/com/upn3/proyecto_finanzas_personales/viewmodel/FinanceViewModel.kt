@@ -55,7 +55,9 @@ data class FinanceState(
     val lastRatesUpdate: Long = 0L,
     val searchQuery: String = "",
     val selectedTab: Int = 0, // 0: Todas, 1: Gastos, 2: Ingresos, 3: Transferencias, 4: Conversiones
-    val filteredTransactions: List<Transaction> = emptyList()
+    val filteredTransactions: List<Transaction> = emptyList(),
+    val auditLogs: List<AuditLog> = emptyList(),
+    val isLoadingAuditLogs: Boolean = false
 )
 
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
@@ -677,6 +679,37 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private fun addAuditLog(email: String, transactionId: String, log: AuditLog) {
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email)
+                    .collection("transactions").document(transactionId)
+                    .collection("audit_logs").document(log.id)
+                    .set(log).await()
+            } catch (e: Exception) {
+                Log.w("FinanceViewModel", "Audit log failed: ${e.message}")
+            }
+        }
+    }
+
+    fun loadAuditLogs(transactionId: String) {
+        val email = uiState.value.currentUser?.email ?: return
+        _uiState.update { it.copy(isLoadingAuditLogs = true, auditLogs = emptyList()) }
+        viewModelScope.launch {
+            try {
+                val snapshot = db.collection("users").document(email)
+                    .collection("transactions").document(transactionId)
+                    .collection("audit_logs")
+                    .orderBy("timestamp", Query.Direction.ASCENDING)
+                    .get().await()
+                val logs = snapshot.toObjects(AuditLog::class.java)
+                _uiState.update { it.copy(auditLogs = logs, isLoadingAuditLogs = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(auditLogs = emptyList(), isLoadingAuditLogs = false) }
+            }
+        }
+    }
+
     fun updateTransaction(transaction: Transaction, onSuccess: () -> Unit = {}) {
         val email = uiState.value.currentUser?.email ?: return
         val oldTransaction = allTransactions.find { it.id == transaction.id }
@@ -698,6 +731,34 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
+        // Compute diff before coroutine so oldTransaction is still the original
+        val auditChanges = mutableMapOf<String, Map<String, String>>()
+        if (oldTransaction != null) {
+            if (oldTransaction.amount != transaction.amount)
+                auditChanges["monto"] = mapOf("old" to "%.2f".format(oldTransaction.amount), "new" to "%.2f".format(transaction.amount))
+            if (oldTransaction.description != transaction.description)
+                auditChanges["descripción"] = mapOf("old" to oldTransaction.description, "new" to transaction.description)
+            if (oldTransaction.origin != transaction.origin)
+                auditChanges["categoría"] = mapOf("old" to oldTransaction.origin, "new" to transaction.origin)
+            if (oldTransaction.timestamp != transaction.timestamp)
+                auditChanges["fecha"] = mapOf("old" to oldTransaction.timestamp.toString(), "new" to transaction.timestamp.toString())
+        }
+        val voucherAction = when {
+            oldTransaction?.receiptPath == null && transaction.receiptPath != null -> AuditAction.VOUCHER_AGREGADO
+            oldTransaction?.receiptPath != null && transaction.receiptPath == null -> AuditAction.VOUCHER_ELIMINADO
+            oldTransaction?.receiptPath != null && transaction.receiptPath != null
+                    && oldTransaction.receiptPath != transaction.receiptPath -> AuditAction.VOUCHER_REEMPLAZADO
+            else -> null
+        }
+        if (voucherAction != null) {
+            auditChanges["comprobante"] = mapOf(
+                "old" to (oldTransaction?.receiptPath ?: ""),
+                "new" to (transaction.receiptPath ?: "")
+            )
+        }
+        val auditAction = if (auditChanges.size == 1 && auditChanges.containsKey("comprobante") && voucherAction != null)
+            voucherAction else AuditAction.EDICION
+
         val updatedTransaction = transaction.copy(lastModified = System.currentTimeMillis())
         viewModelScope.launch {
             try {
@@ -716,7 +777,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                         if (diff != 0.0) batch.update(db.collection("users").document(email).collection("wallets").document(wallet.id), "balance", wallet.balance + diff)
                     }
                 }.await()
-                
+
                 val index = allTransactions.indexOfFirst { it.id == transaction.id }
                 if (index != -1) allTransactions[index] = updatedTransaction
                 if (oldTransaction != null && wallet != null && !isAdjustment) {
@@ -732,6 +793,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     if (wIndex != -1) allWallets[wIndex] = allWallets[wIndex].copy(balance = allWallets[wIndex].balance + (newImpact - oldImpact))
                 }
                 updateState()
+                addAuditLog(email, transaction.id, AuditLog(
+                    transactionId = transaction.id,
+                    action = auditAction,
+                    userEmail = email,
+                    changedFields = auditChanges
+                ))
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Error al actualizar") }
@@ -786,10 +853,21 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun addTransaction(amount: Double, description: String, origin: String, type: TransactionType, walletId: String? = null, onSuccess: () -> Unit = {}) {
-        addTransactionWithDate(amount, description, origin, type, System.currentTimeMillis(), walletId, null, onSuccess)
+        addTransactionWithDate(amount, description, origin, type, System.currentTimeMillis(), walletId, null, onSuccess = onSuccess)
     }
 
-    fun addTransactionWithDate(amount: Double, description: String, origin: String, type: TransactionType, timestamp: Long, walletId: String? = null, receiptPath: String? = null, onSuccess: () -> Unit = {}) {
+    fun addTransactionWithDate(
+        amount: Double,
+        description: String,
+        origin: String,
+        type: TransactionType,
+        timestamp: Long,
+        walletId: String? = null,
+        receiptPath: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        onSuccess: () -> Unit = {}
+    ) {
         val email = uiState.value.currentUser?.email ?: return
         val targetWalletId = walletId ?: _uiState.value.selectedWallet?.id ?: "default"
         val wallet = allWallets.find { it.id == targetWalletId } ?: return
@@ -799,7 +877,18 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        val transaction = Transaction(amount = amount, currencyCode = wallet.currencyCode, description = description, origin = origin, type = type, walletId = targetWalletId, timestamp = timestamp, receiptPath = receiptPath)
+        val transaction = Transaction(
+            amount = amount,
+            currencyCode = wallet.currencyCode,
+            description = description,
+            origin = origin,
+            type = type,
+            walletId = targetWalletId,
+            timestamp = timestamp,
+            receiptPath = receiptPath,
+            latitude = latitude,
+            longitude = longitude
+        )
         viewModelScope.launch {
             try {
                 db.runBatch { batch ->
@@ -817,6 +906,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     else -> allWallets[wIndex].balance - amount
                 })
                 updateState()
+                addAuditLog(email, transaction.id, AuditLog(
+                    transactionId = transaction.id,
+                    action = AuditAction.CREACION,
+                    userEmail = email
+                ))
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Error al guardar") }
@@ -870,6 +964,55 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Error en transferencia: ${e.message}", isLoading = false) }
+            }
+        }
+    }
+
+    fun addExternalTransfer(
+        fromWallet: Wallet,
+        amount: Double,
+        contact: TransferContact,
+        timestamp: Long = System.currentTimeMillis(),
+        onSuccess: () -> Unit = {}
+    ) {
+        val email = uiState.value.currentUser?.email ?: return
+        if (amount > fromWallet.balance) {
+            _uiState.update { it.copy(errorMessage = "Saldo insuficiente.") }
+            return
+        }
+        val transaction = Transaction(
+            amount = amount,
+            currencyCode = fromWallet.currencyCode,
+            description = "A ${contact.recipientName}",
+            origin = "Transferencia Externa",
+            type = TransactionType.TRANSFER,
+            walletId = fromWallet.id,
+            timestamp = timestamp,
+            transferContact = contact
+        )
+        viewModelScope.launch {
+            try {
+                db.runBatch { batch ->
+                    val userRef = db.collection("users").document(email)
+                    batch.set(userRef.collection("transactions").document(transaction.id), transaction)
+                    batch.update(userRef.collection("wallets").document(fromWallet.id), "balance", fromWallet.balance - amount)
+                }.await()
+                allTransactions.add(0, transaction)
+                val fIdx = allWallets.indexOfFirst { it.id == fromWallet.id }
+                if (fIdx != -1) allWallets[fIdx] = allWallets[fIdx].copy(balance = allWallets[fIdx].balance - amount)
+                updateState()
+                addAuditLog(email, transaction.id, AuditLog(
+                    transactionId = transaction.id,
+                    action = AuditAction.CREACION,
+                    userEmail = email,
+                    changedFields = mapOf(
+                        "destinatario" to mapOf("old" to "", "new" to contact.recipientName),
+                        "monto" to mapOf("old" to "", "new" to "%.2f".format(amount))
+                    )
+                ))
+                onSuccess()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error en transferencia: ${e.message}") }
             }
         }
     }

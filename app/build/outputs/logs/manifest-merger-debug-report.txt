@@ -1,9 +1,16 @@
 -- Merging decision tree log ---
+meta-data#com.google.android.geo.API_KEY
+INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:34:9-36:47
+	android:value
+		INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:36:13-44
+	android:name
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:35:13-58
 manifest
-ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:2:1-38:12
-INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:2:1-38:12
-INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:2:1-38:12
-INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:2:1-38:12
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:2:1-44:12
+INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:2:1-44:12
+INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:2:1-44:12
+INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:2:1-44:12
 MERGED from [androidx.navigation:navigation-common:2.8.7] C:\Users\imano\.gradle\caches\9.3.1\transforms\a98ee13a1864d6496e1d3f3ef5c80a26\workspace\transformed\navigation-common-2.8.7\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-runtime:2.8.7] C:\Users\imano\.gradle\caches\9.3.1\transforms\4902c69fc479ffd4ca2c432c85f9f0e0\workspace\transformed\navigation-runtime-2.8.7\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-common-ktx:2.8.7] C:\Users\imano\.gradle\caches\9.3.1\transforms\c8c3406df922d925d04f00b128bbd523\workspace\transformed\navigation-common-ktx-2.8.7\AndroidManifest.xml:2:1-7:12
@@ -21,6 +28,7 @@ MERGED from [io.coil-kt:coil:2.7.0] C:\Users\imano\.gradle\caches\9.3.1\transfor
 MERGED from [io.coil-kt:coil-base:2.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\c54d2e3b573b482a45be5343b82da2fd\workspace\transformed\coil-base-2.7.0\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.appcompat:appcompat-resources:1.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\d62d7008c60227459931a5b68f58125c\workspace\transformed\appcompat-resources-1.7.0\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.appcompat:appcompat:1.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\333d4ffdc01b25432108429d56413aa7\workspace\transformed\appcompat-1.7.0\AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.maps.android:maps-compose:4.4.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\22d210182ddd8f70402080311c52be9a\workspace\transformed\maps-compose-4.4.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigationevent:navigationevent-android:1.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\99d19e20a0a410d7835eb8d52c939840\workspace\transformed\navigationevent\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.navigationevent:navigationevent-compose-android:1.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\ecf87caa880177e3d487bc75fd09dabf\workspace\transformed\navigationevent-compose\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.material3:material3-android:1.4.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\ee36b6fa7318db25daba90946bca56a5\workspace\transformed\material3\AndroidManifest.xml:17:1-22:12
@@ -40,9 +48,12 @@ MERGED from [androidx.compose.ui:ui-tooling-android:1.10.4] C:\Users\imano\.grad
 MERGED from [androidx.compose.ui:ui-graphics-android:1.10.4] C:\Users\imano\.gradle\caches\9.3.1\transforms\18b83a4fc421f18fb531d0b1bf32d80b\workspace\transformed\ui-graphics\AndroidManifest.xml:2:1-7:12
 MERGED from [com.google.accompanist:accompanist-drawablepainter:0.32.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\217570479b4b336374d63a859891523f\workspace\transformed\accompanist-drawablepainter-0.32.0\AndroidManifest.xml:17:1-23:12
 MERGED from [androidx.activity:activity-ktx:1.13.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\bf644086c9c38e36ecd00ecf2c0e1e70\workspace\transformed\activity-ktx-1.13.0\AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.maps.android:maps-ktx:5.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b369f8232b00ed0258da332d0e414f5e\workspace\transformed\maps-ktx-5.0.0\AndroidManifest.xml:18:1-23:12
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:17:1-44:12
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:2:1-26:12
 MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\a90a2fb830d8aba8d1ecc4f4a3de5200\workspace\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:2:1-18:12
 MERGED from [com.google.firebase:firebase-storage:22.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\76109a983f0c3c0381d675fc0cb22654\workspace\transformed\firebase-storage-22.0.1\AndroidManifest.xml:15:1-39:12
+MERGED from [com.google.android.gms:play-services-location:21.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\1e2f35c50be27c00265f01aa71bb1014\workspace\transformed\play-services-location-21.3.0\AndroidManifest.xml:2:1-8:12
 MERGED from [com.google.firebase:firebase-database-collection:18.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\388b891cfb1e15881528a93a212d6ba0\workspace\transformed\firebase-database-collection-18.0.1\AndroidManifest.xml:2:1-9:12
 MERGED from [com.google.android.gms:play-services-auth:21.1.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\547a26c68d968377ffd3b35bd407fae3\workspace\transformed\play-services-auth-21.1.1\AndroidManifest.xml:17:1-40:12
 MERGED from [com.google.android.gms:play-services-auth-api-phone:18.0.2] C:\Users\imano\.gradle\caches\9.3.1\transforms\078216e2438ab268635edefa5c420fc1\workspace\transformed\play-services-auth-api-phone-18.0.2\AndroidManifest.xml:2:1-7:12
@@ -144,6 +155,8 @@ uses-permission#android.permission.INTERNET
 ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:5:5-67
 MERGED from [com.google.firebase:firebase-auth:24.1.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\c253f6fe8907ff669d2ac79ccda04a17\workspace\transformed\firebase-auth-24.1.0\AndroidManifest.xml:25:5-67
 MERGED from [com.google.firebase:firebase-auth:24.1.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\c253f6fe8907ff669d2ac79ccda04a17\workspace\transformed\firebase-auth-24.1.0\AndroidManifest.xml:25:5-67
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:24:5-67
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:24:5-67
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:11:5-67
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:11:5-67
 MERGED from [com.google.firebase:firebase-storage:22.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\76109a983f0c3c0381d675fc0cb22654\workspace\transformed\firebase-storage-22.0.1\AndroidManifest.xml:24:5-67
@@ -152,9 +165,17 @@ MERGED from [com.google.android.recaptcha:recaptcha:18.6.1] C:\Users\imano\.grad
 MERGED from [com.google.android.recaptcha:recaptcha:18.6.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\5f6f27ea235130d24ad9d66497d76c13\workspace\transformed\recaptcha-18.6.1\AndroidManifest.xml:7:5-67
 	android:name
 		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:5:22-64
+uses-permission#android.permission.ACCESS_FINE_LOCATION
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:6:5-79
+	android:name
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:6:22-76
+uses-permission#android.permission.ACCESS_COARSE_LOCATION
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:7:5-81
+	android:name
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:7:22-78
 application
-ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:7:5-36:19
-INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:7:5-36:19
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:9:5-42:19
+INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:9:5-42:19
 MERGED from [com.vanniktech:android-image-cropper:4.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\e9b1145b55e731fba428e8044363ae28\workspace\transformed\android-image-cropper-4.7.0\AndroidManifest.xml:20:5-34:19
 MERGED from [com.vanniktech:android-image-cropper:4.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\e9b1145b55e731fba428e8044363ae28\workspace\transformed\android-image-cropper-4.7.0\AndroidManifest.xml:20:5-34:19
 MERGED from [com.google.firebase:firebase-auth:24.1.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\c253f6fe8907ff669d2ac79ccda04a17\workspace\transformed\firebase-auth-24.1.0\AndroidManifest.xml:28:5-73:19
@@ -163,12 +184,16 @@ MERGED from [androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users
 MERGED from [androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\0964efda9887e0ecf86471b73b576e20\workspace\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:23:5-50:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.10.4] C:\Users\imano\.gradle\caches\9.3.1\transforms\afd0acb5b3c2e799af4e69c1a877f44c\workspace\transformed\ui-tooling\AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.10.4] C:\Users\imano\.gradle\caches\9.3.1\transforms\afd0acb5b3c2e799af4e69c1a877f44c\workspace\transformed\ui-tooling\AndroidManifest.xml:22:5-26:19
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:36:5-42:19
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:36:5-42:19
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:13:5-24:19
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:13:5-24:19
 MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\a90a2fb830d8aba8d1ecc4f4a3de5200\workspace\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:8:5-16:19
 MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\a90a2fb830d8aba8d1ecc4f4a3de5200\workspace\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:8:5-16:19
 MERGED from [com.google.firebase:firebase-storage:22.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\76109a983f0c3c0381d675fc0cb22654\workspace\transformed\firebase-storage-22.0.1\AndroidManifest.xml:26:5-37:19
 MERGED from [com.google.firebase:firebase-storage:22.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\76109a983f0c3c0381d675fc0cb22654\workspace\transformed\firebase-storage-22.0.1\AndroidManifest.xml:26:5-37:19
+MERGED from [com.google.android.gms:play-services-location:21.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\1e2f35c50be27c00265f01aa71bb1014\workspace\transformed\play-services-location-21.3.0\AndroidManifest.xml:6:5-20
+MERGED from [com.google.android.gms:play-services-location:21.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\1e2f35c50be27c00265f01aa71bb1014\workspace\transformed\play-services-location-21.3.0\AndroidManifest.xml:6:5-20
 MERGED from [com.google.android.gms:play-services-auth:21.1.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\547a26c68d968377ffd3b35bd407fae3\workspace\transformed\play-services-auth-21.1.1\AndroidManifest.xml:22:5-38:19
 MERGED from [com.google.android.gms:play-services-auth:21.1.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\547a26c68d968377ffd3b35bd407fae3\workspace\transformed\play-services-auth-21.1.1\AndroidManifest.xml:22:5-38:19
 MERGED from [com.google.android.gms:play-services-auth-blockstore:16.4.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\709fe16815f96b59b71dc3eec93f1c48\workspace\transformed\play-services-auth-blockstore-16.4.0\AndroidManifest.xml:7:5-20
@@ -218,55 +243,55 @@ MERGED from [com.google.android.play:core-common:2.0.3] C:\Users\imano\.gradle\c
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.18.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\362c1479d17a722b781be01293239297\workspace\transformed\core-1.18.0\AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:14:9-35
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:16:9-35
 	android:label
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:12:9-41
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:14:9-41
 	android:fullBackupContent
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:10:9-54
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:12:9-54
 	android:roundIcon
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:13:9-54
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:15:9-54
 	android:icon
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:11:9-43
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:13:9-43
 	android:allowBackup
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:8:9-35
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:10:9-35
 	android:theme
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:15:9-66
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:17:9-66
 	android:dataExtractionRules
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:9:9-65
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:11:9-65
 activity#com.yalantis.ucrop.UCropActivity
-ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:16:9-19:72
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:18:9-21:72
 	android:screenOrientation
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:18:13-49
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:20:13-49
 	android:theme
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:19:13-69
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:21:13-69
 	android:name
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:17:13-60
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:19:13-60
 activity#com.upn3.proyecto_finanzas_personales.MainActivity
-ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:20:9-30:20
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:22:9-32:20
 	android:label
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:23:13-45
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:25:13-45
 	android:exported
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:22:13-36
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:24:13-36
 	android:theme
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:24:13-70
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:26:13-70
 	android:name
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:21:13-41
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:23:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:25:13-29:29
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:27:13-31:29
 action#android.intent.action.MAIN
-ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:26:17-69
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:28:17-69
 	android:name
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:26:25-66
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:28:25-66
 category#android.intent.category.LAUNCHER
-ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:28:17-77
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:30:17-77
 	android:name
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:28:27-74
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:30:27-74
 meta-data#com.google.mlkit.vision.DEPENDENCIES
-ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:32:9-34:35
+ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:38:9-40:35
 	android:value
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:34:13-32
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:40:13-32
 	android:name
-		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:33:13-64
+		ADDED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml:39:13-64
 uses-sdk
 INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml
@@ -305,6 +330,8 @@ MERGED from [androidx.appcompat:appcompat-resources:1.7.0] C:\Users\imano\.gradl
 MERGED from [androidx.appcompat:appcompat-resources:1.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\d62d7008c60227459931a5b68f58125c\workspace\transformed\appcompat-resources-1.7.0\AndroidManifest.xml:5:5-44
 MERGED from [androidx.appcompat:appcompat:1.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\333d4ffdc01b25432108429d56413aa7\workspace\transformed\appcompat-1.7.0\AndroidManifest.xml:5:5-44
 MERGED from [androidx.appcompat:appcompat:1.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\333d4ffdc01b25432108429d56413aa7\workspace\transformed\appcompat-1.7.0\AndroidManifest.xml:5:5-44
+MERGED from [com.google.maps.android:maps-compose:4.4.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\22d210182ddd8f70402080311c52be9a\workspace\transformed\maps-compose-4.4.1\AndroidManifest.xml:20:5-44
+MERGED from [com.google.maps.android:maps-compose:4.4.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\22d210182ddd8f70402080311c52be9a\workspace\transformed\maps-compose-4.4.1\AndroidManifest.xml:20:5-44
 MERGED from [androidx.navigationevent:navigationevent-android:1.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\99d19e20a0a410d7835eb8d52c939840\workspace\transformed\navigationevent\AndroidManifest.xml:5:5-44
 MERGED from [androidx.navigationevent:navigationevent-android:1.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\99d19e20a0a410d7835eb8d52c939840\workspace\transformed\navigationevent\AndroidManifest.xml:5:5-44
 MERGED from [androidx.navigationevent:navigationevent-compose-android:1.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\ecf87caa880177e3d487bc75fd09dabf\workspace\transformed\navigationevent-compose\AndroidManifest.xml:5:5-44
@@ -343,12 +370,18 @@ MERGED from [com.google.accompanist:accompanist-drawablepainter:0.32.0] C:\Users
 MERGED from [com.google.accompanist:accompanist-drawablepainter:0.32.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\217570479b4b336374d63a859891523f\workspace\transformed\accompanist-drawablepainter-0.32.0\AndroidManifest.xml:21:5-44
 MERGED from [androidx.activity:activity-ktx:1.13.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\bf644086c9c38e36ecd00ecf2c0e1e70\workspace\transformed\activity-ktx-1.13.0\AndroidManifest.xml:5:5-44
 MERGED from [androidx.activity:activity-ktx:1.13.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\bf644086c9c38e36ecd00ecf2c0e1e70\workspace\transformed\activity-ktx-1.13.0\AndroidManifest.xml:5:5-44
+MERGED from [com.google.maps.android:maps-ktx:5.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b369f8232b00ed0258da332d0e414f5e\workspace\transformed\maps-ktx-5.0.0\AndroidManifest.xml:21:5-44
+MERGED from [com.google.maps.android:maps-ktx:5.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b369f8232b00ed0258da332d0e414f5e\workspace\transformed\maps-ktx-5.0.0\AndroidManifest.xml:21:5-44
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:20:5-44
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:20:5-44
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:6:5-44
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:6:5-44
 MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\a90a2fb830d8aba8d1ecc4f4a3de5200\workspace\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:5:5-44
 MERGED from [com.google.firebase:firebase-storage-ktx:21.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\a90a2fb830d8aba8d1ecc4f4a3de5200\workspace\transformed\firebase-storage-ktx-21.0.1\AndroidManifest.xml:5:5-44
 MERGED from [com.google.firebase:firebase-storage:22.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\76109a983f0c3c0381d675fc0cb22654\workspace\transformed\firebase-storage-22.0.1\AndroidManifest.xml:19:5-44
 MERGED from [com.google.firebase:firebase-storage:22.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\76109a983f0c3c0381d675fc0cb22654\workspace\transformed\firebase-storage-22.0.1\AndroidManifest.xml:19:5-44
+MERGED from [com.google.android.gms:play-services-location:21.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\1e2f35c50be27c00265f01aa71bb1014\workspace\transformed\play-services-location-21.3.0\AndroidManifest.xml:4:5-44
+MERGED from [com.google.android.gms:play-services-location:21.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\1e2f35c50be27c00265f01aa71bb1014\workspace\transformed\play-services-location-21.3.0\AndroidManifest.xml:4:5-44
 MERGED from [com.google.firebase:firebase-database-collection:18.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\388b891cfb1e15881528a93a212d6ba0\workspace\transformed\firebase-database-collection-18.0.1\AndroidManifest.xml:5:5-7:41
 MERGED from [com.google.firebase:firebase-database-collection:18.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\388b891cfb1e15881528a93a212d6ba0\workspace\transformed\firebase-database-collection-18.0.1\AndroidManifest.xml:5:5-7:41
 MERGED from [com.google.android.gms:play-services-auth:21.1.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\547a26c68d968377ffd3b35bd407fae3\workspace\transformed\play-services-auth-21.1.1\AndroidManifest.xml:20:5-44
@@ -531,6 +564,8 @@ MERGED from [com.google.android.play:core-common:2.0.3] C:\Users\imano\.gradle\c
 		INJECTED from C:\Users\imano\AndroidStudioProjects\appMovilFinanzas\app\src\main\AndroidManifest.xml
 queries
 ADDED from [com.vanniktech:android-image-cropper:4.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\e9b1145b55e731fba428e8044363ae28\workspace\transformed\android-image-cropper-4.7.0\AndroidManifest.xml:7:5-18:15
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:30:5-34:15
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:30:5-34:15
 intent#action:name:android.intent.action.GET_CONTENT+category:name:android.intent.category.OPENABLE+data:mimeType:*/*
 ADDED from [com.vanniktech:android-image-cropper:4.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\e9b1145b55e731fba428e8044363ae28\workspace\transformed\android-image-cropper-4.7.0\AndroidManifest.xml:8:9-14:18
 action#android.intent.action.GET_CONTENT
@@ -575,6 +610,8 @@ ADDED from [com.vanniktech:android-image-cropper:4.7.0] C:\Users\imano\.gradle\c
 		ADDED from [com.vanniktech:android-image-cropper:4.7.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\e9b1145b55e731fba428e8044363ae28\workspace\transformed\android-image-cropper-4.7.0\AndroidManifest.xml:32:13-64
 uses-permission#android.permission.ACCESS_NETWORK_STATE
 ADDED from [com.google.firebase:firebase-auth:24.1.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\c253f6fe8907ff669d2ac79ccda04a17\workspace\transformed\firebase-auth-24.1.0\AndroidManifest.xml:26:5-79
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:23:5-79
+MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:23:5-79
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:10:5-79
 MERGED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:10:5-79
 MERGED from [com.google.firebase:firebase-storage:22.0.1] C:\Users\imano\.gradle\caches\9.3.1\transforms\76109a983f0c3c0381d675fc0cb22654\workspace\transformed\firebase-storage-22.0.1\AndroidManifest.xml:23:5-79
@@ -711,6 +748,22 @@ ADDED from [androidx.compose.ui:ui-tooling-android:1.10.4] C:\Users\imano\.gradl
 		ADDED from [androidx.compose.ui:ui-tooling-android:1.10.4] C:\Users\imano\.gradle\caches\9.3.1\transforms\afd0acb5b3c2e799af4e69c1a877f44c\workspace\transformed\ui-tooling\AndroidManifest.xml:25:13-36
 	android:name
 		ADDED from [androidx.compose.ui:ui-tooling-android:1.10.4] C:\Users\imano\.gradle\caches\9.3.1\transforms\afd0acb5b3c2e799af4e69c1a877f44c\workspace\transformed\ui-tooling\AndroidManifest.xml:24:13-71
+uses-feature#0x00020000
+ADDED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:26:5-28:35
+	android:glEsVersion
+		ADDED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:27:9-41
+	android:required
+		ADDED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:28:9-32
+package#com.google.android.apps.maps
+ADDED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:33:9-64
+	android:name
+		ADDED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:33:18-61
+uses-library#org.apache.http.legacy
+ADDED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:39:9-41:40
+	android:required
+		ADDED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:41:13-37
+	android:name
+		ADDED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\971857c959fb8f3ba7f479563d554491\workspace\transformed\play-services-maps-19.0.0\AndroidManifest.xml:40:13-50
 meta-data#com.google.firebase.components:com.google.firebase.firestore.FirebaseFirestoreKtxRegistrar
 ADDED from [com.google.firebase:firebase-firestore:26.3.0] C:\Users\imano\.gradle\caches\9.3.1\transforms\b4d575b3ff08ec005420a02527e5e517\workspace\transformed\firebase-firestore-26.3.0\AndroidManifest.xml:17:13-19:85
 	android:value

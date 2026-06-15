@@ -16,6 +16,8 @@ data class Transaction(
     val type: TransactionType = TransactionType.INCOME,
     val timestamp: Long = System.currentTimeMillis(),
     val lastModified: Long? = null,
-    val receiptPath: String? = null
-
+    val receiptPath: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val transferContact: TransferContact? = null
 )

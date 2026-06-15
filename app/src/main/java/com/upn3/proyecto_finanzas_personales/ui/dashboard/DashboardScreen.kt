@@ -29,7 +29,11 @@ import androidx.compose.ui.window.DialogProperties
 import com.upn3.proyecto_finanzas_personales.model.Category
 import com.upn3.proyecto_finanzas_personales.model.Transaction
 import com.upn3.proyecto_finanzas_personales.model.TransactionType
+import com.upn3.proyecto_finanzas_personales.model.TransferContact
+import com.upn3.proyecto_finanzas_personales.model.Wallet
+import com.upn3.proyecto_finanzas_personales.ui.components.ConversionDetailDialog
 import com.upn3.proyecto_finanzas_personales.ui.components.NumericKeyboard
+import com.upn3.proyecto_finanzas_personales.ui.components.TransactionDetailDialog
 import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -37,6 +41,14 @@ import java.util.*
 import androidx.compose.foundation.clickable
 import android.net.Uri
 import coil.compose.AsyncImage
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import com.yalantis.ucrop.UCrop
+import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
@@ -53,16 +65,18 @@ fun DashboardScreen(
     
     var showEditTransactionDialog by remember { mutableStateOf(false) }
     var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
-    var selectedConversion by remember {mutableStateOf<Transaction?>(null) }
-    var showConversionDialog by remember {mutableStateOf(false) }
-    var selectedTransactionDetail by remember {mutableStateOf<Transaction?>(null)}
-    var showTransactionDetailDialog by remember {mutableStateOf(false)}
+    var selectedConversion by remember { mutableStateOf<Transaction?>(null) }
+    var showConversionDialog by remember { mutableStateOf(false) }
+    var selectedTransactionDetail by remember { mutableStateOf<Transaction?>(null) }
+    var showTransactionDetailDialog by remember { mutableStateOf(false) }
+    var selectedCategoryIcon by remember { mutableStateOf("Category") }
     var showVoucherDialog by remember {mutableStateOf(false)}
     var editAmount by remember { mutableStateOf("") }
     var editDescription by remember { mutableStateOf("") }
     var editCategory by remember { mutableStateOf<Category?>(null) }
     var editDate by remember { mutableStateOf(Calendar.getInstance()) }
     var showEditDatePicker by remember { mutableStateOf(false) }
+    var editReceiptPath by remember { mutableStateOf<String?>(null) }
 
     val searchQuery = uiState.searchQuery
     val selectedTab = uiState.selectedTab
@@ -71,7 +85,14 @@ fun DashboardScreen(
 
     var showTransferDialog by remember { mutableStateOf(false) }
     var transferAmount by remember { mutableStateOf("") }
-    var selectedToWallet by remember { mutableStateOf<com.upn3.proyecto_finanzas_personales.model.Wallet?>(null) }
+    var selectedToWallet by remember { mutableStateOf<Wallet?>(null) }
+    var transferMode by remember { mutableStateOf(0) }
+    var extRecipientName by remember { mutableStateOf("") }
+    var extRecipientAlias by remember { mutableStateOf("") }
+    var extBank by remember { mutableStateOf("") }
+    var extMotivo by remember { mutableStateOf("") }
+    var extTransferDate by remember { mutableStateOf(Calendar.getInstance()) }
+    var showExtDatePicker by remember { mutableStateOf(false) }
     var showAddWalletDialog by remember { mutableStateOf(false) }
     var showEditWalletDialog by remember { mutableStateOf(false) }
     var editingWallet by remember { mutableStateOf<com.upn3.proyecto_finanzas_personales.model.Wallet?>(null) }
@@ -89,9 +110,36 @@ fun DashboardScreen(
     )
 
     val currentUser = uiState.currentUser
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
+
+    val editCropLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            UCrop.getOutput(result.data!!)?.let { resultUri ->
+                val dir = File(context.filesDir, "vouchers").also { it.mkdirs() }
+                val file = File(dir, "voucher_edit_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(resultUri)?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                editReceiptPath = Uri.fromFile(file).toString()
+            }
+        }
+    }
+    val editImagePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val dest = Uri.fromFile(File(context.cacheDir, "voucher_edit_${System.currentTimeMillis()}.jpg"))
+            val intent = UCrop.of(it, dest)
+                .withOptions(UCrop.Options().apply { setFreeStyleCropEnabled(true) })
+                .getIntent(context)
+            editCropLauncher.launch(intent)
+        }
+    }
 
     // Clear error when leaving the screen
     DisposableEffect(Unit) {
@@ -365,6 +413,8 @@ fun DashboardScreen(
 
                             } else {
 
+                                selectedCategoryIcon = uiState.categories
+                                    .find { it.name == transaction.origin }?.icon ?: "Category"
                                 selectedTransactionDetail = transaction
                                 showTransactionDetailDialog = true
 
@@ -434,6 +484,7 @@ fun DashboardScreen(
                                     editAmount = transaction.amount.toString()
                                     editDescription = transaction.description
                                     editCategory = uiState.categories.find { it.name == transaction.origin }
+                                    editReceiptPath = transaction.receiptPath
                                     showEditTransactionDialog = true
                                     editDate = Calendar.getInstance().apply { timeInMillis = transaction.timestamp }
                                     viewModel.clearError()
@@ -761,128 +812,317 @@ fun DashboardScreen(
 
     if (showTransferDialog) {
         val fromWallet = uiState.selectedWallet
-        
-        LaunchedEffect(selectedToWallet?.id) {
-            if (fromWallet != null && selectedToWallet != null) {
+
+        LaunchedEffect(selectedToWallet?.id, transferMode) {
+            if (transferMode == 0 && fromWallet != null && selectedToWallet != null) {
                 viewModel.fetchExchangeRatePreview(fromWallet.currencyCode, selectedToWallet!!.currencyCode)
             }
         }
 
-        AlertDialog(
-            onDismissRequest = { showTransferDialog = false },
-            title = { Text("Transferir entre Billeteras") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Desde: ${fromWallet?.name} (${fromWallet?.currencyCode})", style = MaterialTheme.typography.bodyMedium)
-                    
-                    Text("Hacia:", style = MaterialTheme.typography.labelLarge)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(
-                            uiState.wallets.filter { it.id != fromWallet?.id },
-                            key = { it.id }
-                        ) { wallet ->
-                            val isSelected = selectedToWallet?.id == wallet.id
-                            val flag = currencies.find { it.first == wallet.currencyCode }?.second?.take(2) ?: "💰"
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { 
-                                    selectedToWallet = wallet
-                                    if (fromWallet != null) viewModel.fetchExchangeRatePreview(fromWallet.currencyCode, wallet.currencyCode)
-                                },
-                                label = { Text("$flag ${wallet.name}") }
-                            )
-                        }
-                    }
+        fun resetAndClose() {
+            showTransferDialog = false
+            transferAmount = ""
+            selectedToWallet = null
+            transferMode = 0
+            extRecipientName = ""
+            extRecipientAlias = ""
+            extBank = ""
+            extMotivo = ""
+            extTransferDate = Calendar.getInstance()
+            viewModel.clearError()
+        }
 
-                    OutlinedTextField(
-                        value = transferAmount,
-                        onValueChange = { 
-                            val sanitized = it.replace(",", ".")
-                            if (sanitized.isEmpty() || sanitized.toDoubleOrNull() != null) {
-                                if (!sanitized.contains(".") || sanitized.substringAfter(".").length <= 2) {
-                                    transferAmount = sanitized
-                                    viewModel.clearError()
+        Dialog(
+            onDismissRequest = { resetAndClose() },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+
+                val extDatePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = extTransferDate.let {
+                        val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+                        utcCal.set(it.get(Calendar.YEAR), it.get(Calendar.MONTH), it.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+                        utcCal.set(Calendar.MILLISECOND, 0)
+                        utcCal.timeInMillis
+                    }
+                )
+
+                if (showExtDatePicker) {
+                    DatePickerDialog(
+                        onDismissRequest = { showExtDatePicker = false },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                extDatePickerState.selectedDateMillis?.let { utcMillis ->
+                                    val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcMillis }
+                                    val localCal = Calendar.getInstance().apply {
+                                        set(utcCal.get(Calendar.YEAR), utcCal.get(Calendar.MONTH), utcCal.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                    }
+                                    extTransferDate = localCal
+                                }
+                                showExtDatePicker = false
+                            }) { Text("OK") }
+                        },
+                        dismissButton = { TextButton(onClick = { showExtDatePicker = false }) { Text("Cancelar") } }
+                    ) {
+                        DatePicker(state = extDatePickerState)
+                    }
+                }
+
+                Scaffold(
+                    topBar = {
+                        CenterAlignedTopAppBar(
+                            title = { Text("Transferencia") },
+                            navigationIcon = {
+                                IconButton(onClick = { resetAndClose() }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cerrar")
                                 }
                             }
-                        },
-                        label = { Text("Monto a transferir (${viewModel.getCurrencySymbol(fromWallet?.currencyCode ?: "PEN")})") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                        ),
-                        singleLine = true
-                    )
+                        )
+                    }
+                ) { padding ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        TabRow(selectedTabIndex = transferMode) {
+                            Tab(
+                                selected = transferMode == 0,
+                                onClick = { transferMode = 0; viewModel.clearError() },
+                                text = { Text("Entre Billeteras") }
+                            )
+                            Tab(
+                                selected = transferMode == 1,
+                                onClick = { transferMode = 1; viewModel.clearError() },
+                                text = { Text("A otra persona") }
+                            )
+                        }
 
-                    if (selectedToWallet != null && fromWallet != null && fromWallet.currencyCode != selectedToWallet!!.currencyCode) {
-                        if (uiState.isExchangeLoading) {
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                            }
-                        } else {
-                            val rate = uiState.exchangeRatePreview
-                            if (rate != null) {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f))
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text("Tipo de cambio actual:", style = MaterialTheme.typography.labelSmall)
-                                        Text(
-                                            "1 ${fromWallet.currencyCode} = ${String.format("%.4f", rate)} ${selectedToWallet!!.currencyCode}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        val amt = transferAmount.toDoubleOrNull() ?: 0.0
-                                        Text(
-                                            "Recibirán: ${viewModel.getCurrencySymbol(selectedToWallet!!.currencyCode)} ${String.format("%.2f", amt * rate)}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.primary
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Column(
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            if (transferMode == 0) {
+                                // ── Entre Billeteras ─────────────────────────────
+                                Text(
+                                    "Desde: ${fromWallet?.name} (${fromWallet?.currencyCode})",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text("Hacia:", style = MaterialTheme.typography.labelLarge)
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(
+                                        uiState.wallets.filter { it.id != fromWallet?.id },
+                                        key = { it.id }
+                                    ) { wallet ->
+                                        val isSelected = selectedToWallet?.id == wallet.id
+                                        val flag = currencies.find { it.first == wallet.currencyCode }?.second?.take(2) ?: "💰"
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = {
+                                                selectedToWallet = wallet
+                                                if (fromWallet != null) viewModel.fetchExchangeRatePreview(fromWallet.currencyCode, wallet.currencyCode)
+                                            },
+                                            label = { Text("$flag ${wallet.name}") }
                                         )
                                     }
                                 }
+                                OutlinedTextField(
+                                    value = transferAmount,
+                                    onValueChange = {
+                                        val s = it.replace(",", ".")
+                                        if (s.isEmpty() || s.toDoubleOrNull() != null) {
+                                            if (!s.contains(".") || s.substringAfter(".").length <= 2) {
+                                                transferAmount = s; viewModel.clearError()
+                                            }
+                                        }
+                                    },
+                                    label = { Text("Monto (${viewModel.getCurrencySymbol(fromWallet?.currencyCode ?: "PEN")})") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                                    ),
+                                    singleLine = true
+                                )
+                                if (selectedToWallet != null && fromWallet != null && fromWallet.currencyCode != selectedToWallet!!.currencyCode) {
+                                    if (uiState.isExchangeLoading) {
+                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                        }
+                                    } else {
+                                        val rate = uiState.exchangeRatePreview
+                                        if (rate != null) {
+                                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f))) {
+                                                Column(modifier = Modifier.padding(12.dp)) {
+                                                    Text("Tipo de cambio actual:", style = MaterialTheme.typography.labelSmall)
+                                                    Text(
+                                                        "1 ${fromWallet.currencyCode} = ${String.format("%.4f", rate)} ${selectedToWallet!!.currencyCode}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    val amt = transferAmount.toDoubleOrNull() ?: 0.0
+                                                    Text(
+                                                        "Recibirán: ${viewModel.getCurrencySymbol(selectedToWallet!!.currencyCode)} ${String.format("%.2f", amt * rate)}",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // ── A otra persona ───────────────────────────────
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.AccountBalanceWallet, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        Text("Desde: ${fromWallet?.name} (${fromWallet?.currencyCode})", style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                                OutlinedTextField(
+                                    value = extRecipientName,
+                                    onValueChange = { extRecipientName = it; viewModel.clearError() },
+                                    label = { Text("Nombre del destinatario *") },
+                                    leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = extRecipientAlias,
+                                    onValueChange = { extRecipientAlias = it; viewModel.clearError() },
+                                    label = { Text("Alias / CBU / Cuenta *") },
+                                    leadingIcon = { Icon(Icons.Default.AlternateEmail, null, modifier = Modifier.size(18.dp)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = extBank,
+                                    onValueChange = { extBank = it },
+                                    label = { Text("Banco (opcional)") },
+                                    leadingIcon = { Icon(Icons.Default.AccountBalance, null, modifier = Modifier.size(18.dp)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = extMotivo,
+                                    onValueChange = { extMotivo = it },
+                                    label = { Text("Motivo (opcional)") },
+                                    leadingIcon = { Icon(Icons.Default.Notes, null, modifier = Modifier.size(18.dp)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = transferAmount,
+                                    onValueChange = {
+                                        val s = it.replace(",", ".")
+                                        if (s.isEmpty() || s.toDoubleOrNull() != null) {
+                                            if (!s.contains(".") || s.substringAfter(".").length <= 2) {
+                                                transferAmount = s; viewModel.clearError()
+                                            }
+                                        }
+                                    },
+                                    label = { Text("Monto (${viewModel.getCurrencySymbol(fromWallet?.currencyCode ?: "PEN")}) *") },
+                                    leadingIcon = { Icon(Icons.Default.AttachMoney, null, modifier = Modifier.size(18.dp)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                                    ),
+                                    singleLine = true
+                                )
+                                val extDateFmt = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
+                                OutlinedTextField(
+                                    value = extDateFmt.format(extTransferDate.time),
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Fecha") },
+                                    leadingIcon = { Icon(Icons.Default.CalendarToday, null) },
+                                    modifier = Modifier.fillMaxWidth().clickable { showExtDatePicker = true },
+                                    enabled = false,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
                             }
-                        }
-                    }
 
-                    if (uiState.errorMessage != null) {
-                        Text(
-                            text = uiState.errorMessage!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val amt = transferAmount.toDoubleOrNull()
-                        val from = fromWallet
-                        val to = selectedToWallet
-                        if (amt != null && from != null && to != null) {
-                            viewModel.transferMoney(from, to, amt) {
-                                showTransferDialog = false
-                                transferAmount = ""
-                                selectedToWallet = null
+                            if (uiState.errorMessage != null) {
+                                Text(
+                                    uiState.errorMessage!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             }
+
+                            Button(
+                                onClick = {
+                                    if (transferMode == 0) {
+                                        val amt = transferAmount.toDoubleOrNull()
+                                        val from = fromWallet
+                                        val to = selectedToWallet
+                                        if (amt != null && from != null && to != null) {
+                                            viewModel.transferMoney(from, to, amt) { resetAndClose() }
+                                        }
+                                    } else {
+                                        val amt = transferAmount.toDoubleOrNull()
+                                        val from = fromWallet
+                                        when {
+                                            extRecipientName.isBlank() -> viewModel.setError("El nombre del destinatario es requerido")
+                                            extRecipientAlias.isBlank() -> viewModel.setError("El alias o cuenta es requerido")
+                                            amt == null || amt <= 0 -> viewModel.setError("Ingresa un monto válido")
+                                            from == null -> viewModel.setError("No hay billetera seleccionada")
+                                            amt > from.balance -> viewModel.setError("Saldo insuficiente")
+                                            else -> viewModel.addExternalTransfer(
+                                                fromWallet = from,
+                                                amount = amt,
+                                                contact = TransferContact(
+                                                    recipientName = extRecipientName.trim(),
+                                                    recipientAlias = extRecipientAlias.trim(),
+                                                    bank = extBank.trim(),
+                                                    motivo = extMotivo.trim()
+                                                ),
+                                                timestamp = extTransferDate.timeInMillis,
+                                                onSuccess = { resetAndClose() }
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                enabled = !uiState.isLoading
+                            ) {
+                                if (uiState.isLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary)
+                                } else {
+                                    Text("CONFIRMAR TRANSFERENCIA", style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(24.dp))
                         }
-                    },
-                    enabled = transferAmount.toDoubleOrNull() != null && selectedToWallet != null && !uiState.isLoading && !uiState.isExchangeLoading
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary)
-                    } else {
-                        Text("Transferir")
                     }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTransferDialog = false }) {
-                    Text("Cancelar")
                 }
             }
-        )
+        }
     }
 
     if (showEditBalanceDialog) {
@@ -982,167 +1222,35 @@ fun DashboardScreen(
     }
 
     if (showConversionDialog && selectedConversion != null) {
-
-        AlertDialog(
-            onDismissRequest = {
+        ConversionDetailDialog(
+            transaction = selectedConversion!!,
+            wallet = uiState.wallets.find { it.id == selectedConversion!!.walletId },
+            userEmail = uiState.currentUser?.email ?: "",
+            onDismiss = {
                 showConversionDialog = false
                 selectedConversion = null
-            },
-
-            title = {
-                Text(
-                    "Detalle de Conversión",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-
-            text = {
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-
-                    Text(
-                        selectedConversion!!.description,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    HorizontalDivider()
-
-                    Text(
-                        "Moneda destino: ${selectedConversion!!.currencyCode}"
-                    )
-
-                    Text(
-                        "Fecha:"
-                    )
-
-                    Text(
-                        java.text.SimpleDateFormat(
-                            "dd/MM/yyyy HH:mm:ss",
-                            java.util.Locale.getDefault()
-                        ).format(
-                            java.util.Date(
-                                selectedConversion!!.timestamp
-                            )
-                        )
-                    )
-
-                    Text(
-                        "Origen:"
-                    )
-
-                    Text(
-                        selectedConversion!!.origin
-                    )
-                }
-            },
-
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showConversionDialog = false
-                        selectedConversion = null
-                    }
-                ) {
-                    Text("Cerrar")
-                }
             }
         )
     }
 
     if (showTransactionDetailDialog && selectedTransactionDetail != null) {
-
-        AlertDialog(
-            onDismissRequest = {
+        val tx = selectedTransactionDetail!!
+        TransactionDetailDialog(
+            transaction = tx,
+            categoryIconName = selectedCategoryIcon,
+            wallet = uiState.wallets.find { it.id == tx.walletId },
+            userEmail = uiState.currentUser?.email ?: "",
+            currencySymbol = viewModel.getCurrencySymbol(tx.currencyCode),
+            onDismiss = {
                 showTransactionDetailDialog = false
                 selectedTransactionDetail = null
             },
-
-            title = {
-                Text(
-                    "Detalle de Transacción",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-
-            text = {
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-
-                    val tx = selectedTransactionDetail!!
-
-                    Text(
-                        "Monto: ${
-                            viewModel.getCurrencySymbol(tx.currencyCode)
-                        }${String.format("%.2f", tx.amount)}"
-                    )
-
-                    Text(
-                        "Categoría: ${tx.origin}"
-                    )
-
-                    Text(
-                        "Descripción: ${tx.description}"
-                    )
-
-                    if (!tx.receiptPath.isNullOrBlank()) {
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Button(
-                            onClick = {
-                                showVoucherDialog = true
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("📷 Ver Voucher")
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    Text("Fecha de creación:")
-
-                    Text(
-                        java.text.SimpleDateFormat(
-                            "dd/MM/yyyy HH:mm:ss",
-                            java.util.Locale.getDefault()
-                        ).format(
-                            java.util.Date(tx.timestamp)
-                        )
-                    )
-
-                    tx.lastModified?.let {
-
-                        HorizontalDivider()
-
-                        Text("Última modificación:")
-
-                        Text(
-                            java.text.SimpleDateFormat(
-                                "dd/MM/yyyy HH:mm:ss",
-                                java.util.Locale.getDefault()
-                            ).format(
-                                java.util.Date(it)
-                            )
-                        )
-                    }
-                }
-            },
-
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showTransactionDetailDialog = false
-                        selectedTransactionDetail = null
-                    }
-                ) {
-                    Text("Cerrar")
-                }
-            }
+            onViewVoucher = if (!tx.receiptPath.isNullOrBlank()) {
+                { showVoucherDialog = true }
+            } else null,
+            auditLogs = uiState.auditLogs,
+            isLoadingAuditLogs = uiState.isLoadingAuditLogs,
+            onLoadAuditLogs = { viewModel.loadAuditLogs(tx.id) }
         )
     }
 
@@ -1301,6 +1409,73 @@ fun DashboardScreen(
                                 textStyle = MaterialTheme.typography.bodyLarge
                             )
 
+                            // Comprobante
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            ) {
+                                if (editReceiptPath != null) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        AsyncImage(
+                                            model = Uri.parse(editReceiptPath),
+                                            contentDescription = "Comprobante",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(72.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                "Comprobante adjunto",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                OutlinedButton(
+                                                    onClick = { editImagePickerLauncher.launch("image/*") },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    modifier = Modifier.height(32.dp),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                                ) {
+                                                    Text("Cambiar", style = MaterialTheme.typography.labelSmall)
+                                                }
+                                                OutlinedButton(
+                                                    onClick = { editReceiptPath = null },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    modifier = Modifier.height(32.dp),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                                    colors = ButtonDefaults.outlinedButtonColors(
+                                                        contentColor = MaterialTheme.colorScheme.error
+                                                    ),
+                                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                                                ) {
+                                                    Text("Eliminar", style = MaterialTheme.typography.labelSmall)
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    TextButton(
+                                        onClick = { editImagePickerLauncher.launch("image/*") },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Adjuntar comprobante")
+                                    }
+                                }
+                            }
+
                             // Fecha
                             val dateFormatter = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
                             OutlinedTextField(
@@ -1419,7 +1594,8 @@ fun DashboardScreen(
                                                 amount = amt,
                                                 description = editDescription,
                                                 origin = editCategory!!.name,
-                                                timestamp = editDate.timeInMillis
+                                                timestamp = editDate.timeInMillis,
+                                                receiptPath = editReceiptPath
                                             )
                                             viewModel.updateTransaction(updated) {
                                                 showEditTransactionDialog = false

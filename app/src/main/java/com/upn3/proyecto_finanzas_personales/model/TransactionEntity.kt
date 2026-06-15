@@ -10,6 +10,14 @@ data class TransactionEntity(
     val amount: Double,
     val description: String,
     val origin: String,
-    val type: String, // "INCOME" or "EXPENSE"
-    val timestamp: Long
+    val type: String,
+    val timestamp: Long,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val lastModified: Long? = null,
+    val receiptPath: String? = null,
+    val recipientName: String? = null,
+    val recipientAlias: String? = null,
+    val recipientBank: String? = null,
+    val transferMotivo: String? = null
 )
