@@ -37,21 +37,32 @@ public class AppDatabase_Impl : AppDatabase() {
   }
 
 
+  private val _planningDao: Lazy<PlanningDao> = lazy {
+    PlanningDao_Impl(this)
+  }
+
+
   protected override fun createOpenDelegate(): RoomOpenDelegate {
-    val _openDelegate: RoomOpenDelegate = object : RoomOpenDelegate(3,
-        "a5295daeb55745f6f5a0e1505fc9b538", "775e0b047fde6dcebd176fbccf828efe") {
+    val _openDelegate: RoomOpenDelegate = object : RoomOpenDelegate(4,
+        "b0e385809b5de1f357bacb58869e8ad1", "2cb721b33e7e5cfd87fd847354db2f2d") {
       public override fun createAllTables(connection: SQLiteConnection) {
         connection.execSQL("CREATE TABLE IF NOT EXISTS `transactions` (`id` TEXT NOT NULL, `userEmail` TEXT NOT NULL, `amount` REAL NOT NULL, `description` TEXT NOT NULL, `origin` TEXT NOT NULL, `type` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `latitude` REAL, `longitude` REAL, `lastModified` INTEGER, `receiptPath` TEXT, `recipientName` TEXT, `recipientAlias` TEXT, `recipientBank` TEXT, `transferMotivo` TEXT, PRIMARY KEY(`id`))")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `users` (`email` TEXT NOT NULL, `password` TEXT NOT NULL, `name` TEXT NOT NULL, `lastname` TEXT NOT NULL, `theme` TEXT NOT NULL, `profilePicture` TEXT NOT NULL, PRIMARY KEY(`email`))")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `audit_logs` (`id` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `action` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `userEmail` TEXT NOT NULL, `changedFieldsJson` TEXT NOT NULL, PRIMARY KEY(`id`))")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `budgets` (`id` TEXT NOT NULL, `walletId` TEXT NOT NULL, `categoryName` TEXT NOT NULL, `limitAmount` REAL NOT NULL, `period` TEXT NOT NULL, `currencyCode` TEXT NOT NULL, PRIMARY KEY(`id`))")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `savings_goals` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `targetAmount` REAL NOT NULL, `currentAmount` REAL NOT NULL, `deadline` INTEGER NOT NULL, `currencyCode` TEXT NOT NULL, `color` TEXT NOT NULL, PRIMARY KEY(`id`))")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `fixed_expenses` (`id` TEXT NOT NULL, `description` TEXT NOT NULL, `amount` REAL NOT NULL, `categoryName` TEXT NOT NULL, `walletId` TEXT NOT NULL, `dayOfMonth` INTEGER NOT NULL, `currencyCode` TEXT NOT NULL, `isActive` INTEGER NOT NULL, PRIMARY KEY(`id`))")
         connection.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
-        connection.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a5295daeb55745f6f5a0e1505fc9b538')")
+        connection.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b0e385809b5de1f357bacb58869e8ad1')")
       }
 
       public override fun dropAllTables(connection: SQLiteConnection) {
         connection.execSQL("DROP TABLE IF EXISTS `transactions`")
         connection.execSQL("DROP TABLE IF EXISTS `users`")
         connection.execSQL("DROP TABLE IF EXISTS `audit_logs`")
+        connection.execSQL("DROP TABLE IF EXISTS `budgets`")
+        connection.execSQL("DROP TABLE IF EXISTS `savings_goals`")
+        connection.execSQL("DROP TABLE IF EXISTS `fixed_expenses`")
       }
 
       public override fun onCreate(connection: SQLiteConnection) {
@@ -169,6 +180,93 @@ public class AppDatabase_Impl : AppDatabase() {
               | Found:
               |""".trimMargin() + _existingAuditLogs)
         }
+        val _columnsBudgets: MutableMap<String, TableInfo.Column> = mutableMapOf()
+        _columnsBudgets.put("id", TableInfo.Column("id", "TEXT", true, 1, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsBudgets.put("walletId", TableInfo.Column("walletId", "TEXT", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsBudgets.put("categoryName", TableInfo.Column("categoryName", "TEXT", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsBudgets.put("limitAmount", TableInfo.Column("limitAmount", "REAL", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsBudgets.put("period", TableInfo.Column("period", "TEXT", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsBudgets.put("currencyCode", TableInfo.Column("currencyCode", "TEXT", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        val _foreignKeysBudgets: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
+        val _indicesBudgets: MutableSet<TableInfo.Index> = mutableSetOf()
+        val _infoBudgets: TableInfo = TableInfo("budgets", _columnsBudgets, _foreignKeysBudgets,
+            _indicesBudgets)
+        val _existingBudgets: TableInfo = read(connection, "budgets")
+        if (!_infoBudgets.equals(_existingBudgets)) {
+          return RoomOpenDelegate.ValidationResult(false, """
+              |budgets(com.upn3.proyecto_finanzas_personales.model.BudgetEntity).
+              | Expected:
+              |""".trimMargin() + _infoBudgets + """
+              |
+              | Found:
+              |""".trimMargin() + _existingBudgets)
+        }
+        val _columnsSavingsGoals: MutableMap<String, TableInfo.Column> = mutableMapOf()
+        _columnsSavingsGoals.put("id", TableInfo.Column("id", "TEXT", true, 1, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsSavingsGoals.put("name", TableInfo.Column("name", "TEXT", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsSavingsGoals.put("targetAmount", TableInfo.Column("targetAmount", "REAL", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsSavingsGoals.put("currentAmount", TableInfo.Column("currentAmount", "REAL", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsSavingsGoals.put("deadline", TableInfo.Column("deadline", "INTEGER", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsSavingsGoals.put("currencyCode", TableInfo.Column("currencyCode", "TEXT", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsSavingsGoals.put("color", TableInfo.Column("color", "TEXT", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        val _foreignKeysSavingsGoals: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
+        val _indicesSavingsGoals: MutableSet<TableInfo.Index> = mutableSetOf()
+        val _infoSavingsGoals: TableInfo = TableInfo("savings_goals", _columnsSavingsGoals,
+            _foreignKeysSavingsGoals, _indicesSavingsGoals)
+        val _existingSavingsGoals: TableInfo = read(connection, "savings_goals")
+        if (!_infoSavingsGoals.equals(_existingSavingsGoals)) {
+          return RoomOpenDelegate.ValidationResult(false, """
+              |savings_goals(com.upn3.proyecto_finanzas_personales.model.SavingsGoalEntity).
+              | Expected:
+              |""".trimMargin() + _infoSavingsGoals + """
+              |
+              | Found:
+              |""".trimMargin() + _existingSavingsGoals)
+        }
+        val _columnsFixedExpenses: MutableMap<String, TableInfo.Column> = mutableMapOf()
+        _columnsFixedExpenses.put("id", TableInfo.Column("id", "TEXT", true, 1, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsFixedExpenses.put("description", TableInfo.Column("description", "TEXT", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsFixedExpenses.put("amount", TableInfo.Column("amount", "REAL", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsFixedExpenses.put("categoryName", TableInfo.Column("categoryName", "TEXT", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsFixedExpenses.put("walletId", TableInfo.Column("walletId", "TEXT", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsFixedExpenses.put("dayOfMonth", TableInfo.Column("dayOfMonth", "INTEGER", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsFixedExpenses.put("currencyCode", TableInfo.Column("currencyCode", "TEXT", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsFixedExpenses.put("isActive", TableInfo.Column("isActive", "INTEGER", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        val _foreignKeysFixedExpenses: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
+        val _indicesFixedExpenses: MutableSet<TableInfo.Index> = mutableSetOf()
+        val _infoFixedExpenses: TableInfo = TableInfo("fixed_expenses", _columnsFixedExpenses,
+            _foreignKeysFixedExpenses, _indicesFixedExpenses)
+        val _existingFixedExpenses: TableInfo = read(connection, "fixed_expenses")
+        if (!_infoFixedExpenses.equals(_existingFixedExpenses)) {
+          return RoomOpenDelegate.ValidationResult(false, """
+              |fixed_expenses(com.upn3.proyecto_finanzas_personales.model.FixedExpenseEntity).
+              | Expected:
+              |""".trimMargin() + _infoFixedExpenses + """
+              |
+              | Found:
+              |""".trimMargin() + _existingFixedExpenses)
+        }
         return RoomOpenDelegate.ValidationResult(true, null)
       }
     }
@@ -179,17 +277,19 @@ public class AppDatabase_Impl : AppDatabase() {
     val _shadowTablesMap: MutableMap<String, String> = mutableMapOf()
     val _viewTables: MutableMap<String, Set<String>> = mutableMapOf()
     return InvalidationTracker(this, _shadowTablesMap, _viewTables, "transactions", "users",
-        "audit_logs")
+        "audit_logs", "budgets", "savings_goals", "fixed_expenses")
   }
 
   public override fun clearAllTables() {
-    super.performClear(false, "transactions", "users", "audit_logs")
+    super.performClear(false, "transactions", "users", "audit_logs", "budgets", "savings_goals",
+        "fixed_expenses")
   }
 
   protected override fun getRequiredTypeConverterClasses(): Map<KClass<*>, List<KClass<*>>> {
     val _typeConvertersMap: MutableMap<KClass<*>, List<KClass<*>>> = mutableMapOf()
     _typeConvertersMap.put(TransactionDao::class, TransactionDao_Impl.getRequiredConverters())
     _typeConvertersMap.put(AuditLogDao::class, AuditLogDao_Impl.getRequiredConverters())
+    _typeConvertersMap.put(PlanningDao::class, PlanningDao_Impl.getRequiredConverters())
     return _typeConvertersMap
   }
 
@@ -208,4 +308,6 @@ public class AppDatabase_Impl : AppDatabase() {
   public override fun transactionDao(): TransactionDao = _transactionDao.value
 
   public override fun auditLogDao(): AuditLogDao = _auditLogDao.value
+
+  public override fun planningDao(): PlanningDao = _planningDao.value
 }

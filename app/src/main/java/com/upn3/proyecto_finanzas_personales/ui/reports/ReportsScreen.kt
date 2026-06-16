@@ -5,8 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
@@ -26,6 +28,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import com.upn3.proyecto_finanzas_personales.model.Transaction
 import com.upn3.proyecto_finanzas_personales.model.TransactionType
+import com.upn3.proyecto_finanzas_personales.ui.components.ConversionDetailDialog
+import com.upn3.proyecto_finanzas_personales.ui.components.TransactionDetailDialog
 import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -43,9 +47,17 @@ fun ReportsScreen(
     var showDateRangePicker by remember { mutableStateOf(false) }
     var showTypeMenu by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showMonthPicker by remember { mutableStateOf(false) }
+    var showYearPicker by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    var selectedTransactionDetail by remember { mutableStateOf<Transaction?>(null) }
+    var showTransactionDetailDialog by remember { mutableStateOf(false) }
+    var selectedConversion by remember { mutableStateOf<Transaction?>(null) }
+    var showConversionDialog by remember { mutableStateOf(false) }
+    var selectedCategoryIcon by remember { mutableStateOf("Category") }
 
     var customStartDate by remember { mutableStateOf<Long?>(null) }
     var customEndDate by remember { mutableStateOf<Long?>(null) }
@@ -62,23 +74,32 @@ fun ReportsScreen(
     val dateRangePickerState = rememberDateRangePickerState()
 
     // ── Report data (hoisted so launchers can capture it) ──────────────────────
-    val reportData = remember(uiState.transactions, reportType, selectedDate, customStartDate, customEndDate) {
+    val reportData = remember(uiState.transactions, uiState.convertedTransactions, reportType, selectedDate, customStartDate, customEndDate) {
         val (start, end) = getPeriodBounds(reportType, selectedDate, customStartDate, customEndDate)
-        val filtered = uiState.transactions.filter {
+
+        // Display list: raw transactions with each transaction's original currency.
+        // Mirrors Dashboard Tab-0 list — shows every movement, including "Ajuste de Moneda".
+        val displayList = uiState.transactions.filter {
             it.timestamp in start..end &&
-            (it.origin != "Sistema" || it.description == "Ajuste de Saldo") &&
-            it.origin != "Ajuste de Moneda"
-        }
-        val sorted = filtered.sortedByDescending { it.timestamp }
+            (it.origin != "Sistema" || it.description.contains("Ajuste", ignoreCase = true))
+        }.sortedByDescending { it.timestamp }
+
+        // Totals: use convertedTransactions (amounts already in wallet currency, same source as
+        // Dashboard's StatisticsSection / calculateChartTotals). Falls back to raw transactions
+        // only if convertedTransactions hasn't been loaded yet.
+        val sourceForTotals = uiState.convertedTransactions.ifEmpty { uiState.transactions }
         var income = 0.0; var expense = 0.0; var transfer = 0.0
-        filtered.forEach {
-            when(it.type) {
-                TransactionType.INCOME   -> income += it.amount
-                TransactionType.EXPENSE  -> expense += it.amount
-                TransactionType.TRANSFER -> transfer += it.amount
+        sourceForTotals.filter { tx ->
+            tx.timestamp in start..end &&
+            (tx.origin != "Sistema" || tx.description.contains("Ajuste", ignoreCase = true))
+        }.forEach { tx ->
+            when (tx.type) {
+                TransactionType.INCOME   -> income += tx.amount
+                TransactionType.EXPENSE  -> expense += tx.amount
+                TransactionType.TRANSFER -> transfer += tx.amount
             }
         }
-        Triple(sorted, Pair(income, expense), transfer)
+        Triple(displayList, Pair(income, expense), transfer)
     }
     val sortedTransactions = reportData.first
     val (totalIncome, totalExpense) = reportData.second
@@ -86,7 +107,6 @@ fun ReportsScreen(
     val currentSymbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN")
     val reportTitle = when(reportType) {
         ReportType.DAILY   -> "Reporte Diario"
-        ReportType.WEEKLY  -> "Reporte Semanal"
         ReportType.MONTHLY -> "Reporte Mensual"
         ReportType.YEARLY  -> "Reporte Anual"
         ReportType.CUSTOM  -> "Reporte Personalizado"
@@ -271,6 +291,132 @@ fun ReportsScreen(
         }
     }
 
+    // ── Month picker dialog ────────────────────────────────────────────────────
+    if (showMonthPicker) {
+        var pickerYear by remember { mutableStateOf(selectedDate.get(Calendar.YEAR)) }
+        val monthNames = listOf("Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic")
+        val monthRows = listOf(0..2, 3..5, 6..8, 9..11)
+        AlertDialog(
+            onDismissRequest = { showMonthPicker = false },
+            title = { Text("Seleccionar mes", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { pickerYear-- }) {
+                            Icon(Icons.Default.ChevronLeft, null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                        Text("$pickerYear", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        IconButton(onClick = { pickerYear++ }) {
+                            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    monthRows.forEach { range ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            range.forEach { monthIdx ->
+                                val isSelected = pickerYear == selectedDate.get(Calendar.YEAR) &&
+                                        monthIdx == selectedDate.get(Calendar.MONTH)
+                                Surface(
+                                    onClick = {
+                                        selectedDate = Calendar.getInstance().also { c ->
+                                            c.set(Calendar.YEAR, pickerYear)
+                                            c.set(Calendar.MONTH, monthIdx)
+                                            c.set(Calendar.DAY_OF_MONTH, 1)
+                                        }
+                                        showMonthPicker = false
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            monthNames[monthIdx],
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showMonthPicker = false }) { Text("Cancelar") } }
+        )
+    }
+
+    // ── Year picker dialog ─────────────────────────────────────────────────────
+    if (showYearPicker) {
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+        val years = (currentYear + 1 downTo currentYear - 10).toList()
+        AlertDialog(
+            onDismissRequest = { showYearPicker = false },
+            title = { Text("Seleccionar año", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    years.forEach { year ->
+                        val isSelected = selectedDate.get(Calendar.YEAR) == year
+                        Surface(
+                            onClick = {
+                                selectedDate = Calendar.getInstance().also { c ->
+                                    c.set(Calendar.YEAR, year)
+                                    c.set(Calendar.MONTH, Calendar.JANUARY)
+                                    c.set(Calendar.DAY_OF_MONTH, 1)
+                                }
+                                showYearPicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                    else Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    "$year",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                            else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (year == currentYear) {
+                                    Text(
+                                        "(año actual)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showYearPicker = false }) { Text("Cancelar") } }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -295,99 +441,137 @@ fun ReportsScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
 
             // ── Date Selector ─────────────────────────────────────────────────
-            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Surface(
-                    onClick = { showTypeMenu = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                            Column {
-                                Text(
-                                    when(reportType) {
-                                        ReportType.DAILY -> "DIARIO"
-                                        ReportType.WEEKLY -> "SEMANAL"
-                                        ReportType.MONTHLY -> "MENSUAL"
-                                        ReportType.YEARLY -> "ANUAL"
-                                        ReportType.CUSTOM -> "PERSONALIZADO"
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    getReportDateRangeText(reportType, selectedDate, customStartDate, customEndDate),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+            Row(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // ◀ Previous period
+                IconButton(
+                    onClick = {
+                        selectedDate = (selectedDate.clone() as Calendar).also { c ->
+                            when (reportType) {
+                                ReportType.DAILY   -> c.add(Calendar.DAY_OF_MONTH, -1)
+                                ReportType.MONTHLY -> c.add(Calendar.MONTH, -1)
+                                ReportType.YEARLY  -> c.add(Calendar.YEAR, -1)
+                                ReportType.CUSTOM  -> {}
                             }
                         }
-                        Icon(Icons.Default.UnfoldMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    },
+                    enabled = reportType != ReportType.CUSTOM
+                ) {
+                    Icon(
+                        Icons.Default.ChevronLeft, null,
+                        tint = if (reportType != ReportType.CUSTOM) MaterialTheme.colorScheme.primary
+                               else Color.Transparent
+                    )
+                }
+
+                // Type pill + dropdown
+                Box(modifier = Modifier.weight(1f)) {
+                    Surface(
+                        onClick = { showTypeMenu = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                Column {
+                                    Text(
+                                        when (reportType) {
+                                            ReportType.DAILY   -> "DIARIO"
+                                            ReportType.MONTHLY -> "MENSUAL"
+                                            ReportType.YEARLY  -> "ANUAL"
+                                            ReportType.CUSTOM  -> "PERSONALIZADO"
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        getReportDateRangeText(reportType, selectedDate, customStartDate, customEndDate),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                            Icon(Icons.Default.UnfoldMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showTypeMenu,
+                        onDismissRequest = { showTypeMenu = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Por Día") },
+                            leadingIcon = { Icon(Icons.Default.Today, null) },
+                            onClick = {
+                                reportType = ReportType.DAILY
+                                showTypeMenu = false
+                                showDatePicker = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Por Mes") },
+                            leadingIcon = { Icon(Icons.Default.CalendarMonth, null) },
+                            onClick = {
+                                reportType = ReportType.MONTHLY
+                                showTypeMenu = false
+                                showMonthPicker = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Por Año") },
+                            leadingIcon = { Icon(Icons.Default.Event, null) },
+                            onClick = {
+                                reportType = ReportType.YEARLY
+                                showTypeMenu = false
+                                showYearPicker = true
+                            }
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Rango Personalizado") },
+                            leadingIcon = { Icon(Icons.Default.DateRange, null) },
+                            onClick = {
+                                reportType = ReportType.CUSTOM
+                                showTypeMenu = false
+                                showDateRangePicker = true
+                            }
+                        )
                     }
                 }
 
-                DropdownMenu(
-                    expanded = showTypeMenu,
-                    onDismissRequest = { showTypeMenu = false },
-                    modifier = Modifier.fillMaxWidth(0.9f)
+                // ▶ Next period
+                IconButton(
+                    onClick = {
+                        selectedDate = (selectedDate.clone() as Calendar).also { c ->
+                            when (reportType) {
+                                ReportType.DAILY   -> c.add(Calendar.DAY_OF_MONTH, 1)
+                                ReportType.MONTHLY -> c.add(Calendar.MONTH, 1)
+                                ReportType.YEARLY  -> c.add(Calendar.YEAR, 1)
+                                ReportType.CUSTOM  -> {}
+                            }
+                        }
+                    },
+                    enabled = reportType != ReportType.CUSTOM
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("Por Día") },
-                        leadingIcon = { Icon(Icons.Default.Today, null) },
-                        onClick = {
-                            reportType = ReportType.DAILY
-                            showTypeMenu = false
-                            showDatePicker = true
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Por Semana") },
-                        leadingIcon = { Icon(Icons.Default.DateRange, null) },
-                        onClick = {
-                            reportType = ReportType.WEEKLY
-                            showTypeMenu = false
-                            showDatePicker = true
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Por Mes") },
-                        leadingIcon = { Icon(Icons.Default.CalendarMonth, null) },
-                        onClick = {
-                            reportType = ReportType.MONTHLY
-                            showTypeMenu = false
-                            showDatePicker = true
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Por Año") },
-                        leadingIcon = { Icon(Icons.Default.Event, null) },
-                        onClick = {
-                            reportType = ReportType.YEARLY
-                            showTypeMenu = false
-                            showDatePicker = true
-                        }
-                    )
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text("Rango Personalizado") },
-                        leadingIcon = { Icon(Icons.Default.DateRange, null) },
-                        onClick = {
-                            reportType = ReportType.CUSTOM
-                            showTypeMenu = false
-                            showDateRangePicker = true
-                        }
+                    Icon(
+                        Icons.Default.ChevronRight, null,
+                        tint = if (reportType != ReportType.CUSTOM) MaterialTheme.colorScheme.primary
+                               else Color.Transparent
                     )
                 }
             }
@@ -442,7 +626,21 @@ fun ReportsScreen(
                     items = sortedTransactions,
                     key = { it.id } // Usar ID para optimizar recomposición
                 ) { transaction ->
-                    TransactionReportItem(transaction, viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN"))
+                    val isConversion = transaction.origin == "Ajuste de Moneda"
+                    TransactionReportItem(
+                        transaction = transaction,
+                        currency = viewModel.getCurrencySymbol(transaction.currencyCode),
+                        onClick = {
+                            if (isConversion) {
+                                selectedConversion = transaction
+                                showConversionDialog = true
+                            } else {
+                                selectedCategoryIcon = uiState.categories.find { it.name == transaction.origin }?.icon ?: "Category"
+                                selectedTransactionDetail = transaction
+                                showTransactionDetailDialog = true
+                            }
+                        }
+                    )
                 }
                 
                 if (sortedTransactions.isEmpty()) {
@@ -459,6 +657,37 @@ fun ReportsScreen(
                 }
             }
         }
+    }
+
+    if (showTransactionDetailDialog && selectedTransactionDetail != null) {
+        val tx = selectedTransactionDetail!!
+        TransactionDetailDialog(
+            transaction = tx,
+            categoryIconName = selectedCategoryIcon,
+            wallet = uiState.wallets.find { it.id == tx.walletId },
+            userEmail = uiState.currentUser?.email ?: "",
+            currencySymbol = viewModel.getCurrencySymbol(tx.currencyCode),
+            onDismiss = {
+                showTransactionDetailDialog = false
+                selectedTransactionDetail = null
+            },
+            onViewVoucher = null,
+            auditLogs = uiState.auditLogs,
+            isLoadingAuditLogs = uiState.isLoadingAuditLogs,
+            onLoadAuditLogs = { viewModel.loadAuditLogs(tx.id) }
+        )
+    }
+
+    if (showConversionDialog && selectedConversion != null) {
+        ConversionDetailDialog(
+            transaction = selectedConversion!!,
+            wallet = uiState.wallets.find { it.id == selectedConversion!!.walletId },
+            userEmail = uiState.currentUser?.email ?: "",
+            onDismiss = {
+                showConversionDialog = false
+                selectedConversion = null
+            }
+        )
     }
 }
 
@@ -493,22 +722,32 @@ fun ReportSummaryCard(label: String, amount: Double, color: Color, symbol: Strin
 }
 
 @Composable
-fun TransactionReportItem(transaction: Transaction, currency: String) {
+fun TransactionReportItem(transaction: Transaction, currency: String, onClick: () -> Unit) {
     val fmt = remember { SimpleDateFormat("dd/MM · HH:mm", Locale.getDefault()) }
-    val color = when(transaction.type) {
-        TransactionType.INCOME -> MaterialTheme.colorScheme.primary
-        TransactionType.EXPENSE -> MaterialTheme.colorScheme.error
-        TransactionType.TRANSFER -> MaterialTheme.colorScheme.secondary
+    val isConversion = transaction.origin == "Ajuste de Moneda"
+    val color = when {
+        isConversion -> androidx.compose.ui.graphics.Color(0xFF7C3AED)
+        transaction.type == TransactionType.INCOME -> MaterialTheme.colorScheme.primary
+        transaction.type == TransactionType.EXPENSE -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.secondary
     }
     val prefix = when {
+        isConversion -> ""
         transaction.origin == "Sistema" || transaction.description.contains("Ajuste", ignoreCase = true) -> ""
         transaction.type == TransactionType.INCOME -> "+"
         transaction.type == TransactionType.EXPENSE -> "-"
         transaction.type == TransactionType.TRANSFER -> "⇄ "
         else -> ""
     }
+    val icon = when {
+        isConversion -> Icons.Default.SwapHoriz
+        transaction.type == TransactionType.INCOME -> Icons.Default.ArrowUpward
+        transaction.type == TransactionType.EXPENSE -> Icons.Default.ArrowDownward
+        else -> Icons.Default.SwapHoriz
+    }
 
     Surface(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -516,11 +755,7 @@ fun TransactionReportItem(transaction: Transaction, currency: String) {
     ) {
         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.12f), androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
-                Icon(when(transaction.type) {
-                    TransactionType.INCOME -> Icons.Default.ArrowUpward
-                    TransactionType.EXPENSE -> Icons.Default.ArrowDownward
-                    TransactionType.TRANSFER -> Icons.Default.SwapHoriz
-                }, null, tint = color, modifier = Modifier.size(20.dp))
+                Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(transaction.description, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -531,7 +766,7 @@ fun TransactionReportItem(transaction: Transaction, currency: String) {
     }
 }
 
-enum class ReportType { DAILY, WEEKLY, MONTHLY, YEARLY, CUSTOM }
+enum class ReportType { DAILY, MONTHLY, YEARLY, CUSTOM }
 
 fun getReportDateRangeText(type: ReportType, cal: Calendar, customStart: Long? = null, customEnd: Long? = null): String {
     val df = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -539,17 +774,10 @@ fun getReportDateRangeText(type: ReportType, cal: Calendar, customStart: Long? =
     val yearF = SimpleDateFormat("yyyy", Locale.getDefault())
     
     return when (type) {
-        ReportType.DAILY -> df.format(cal.time)
-        ReportType.WEEKLY -> {
-            val start = cal.clone() as Calendar
-            start.set(Calendar.DAY_OF_WEEK, start.firstDayOfWeek)
-            val end = start.clone() as Calendar
-            end.add(Calendar.DAY_OF_WEEK, 6)
-            "${df.format(start.time)} - ${df.format(end.time)}"
-        }
+        ReportType.DAILY   -> df.format(cal.time)
         ReportType.MONTHLY -> monthF.format(cal.time).replaceFirstChar { it.uppercase() }
-        ReportType.YEARLY -> "Año ${yearF.format(cal.time)}"
-        ReportType.CUSTOM -> {
+        ReportType.YEARLY  -> "Año ${yearF.format(cal.time)}"
+        ReportType.CUSTOM  -> {
             if (customStart != null && customEnd != null) {
                 "${df.format(Date(customStart))} - ${df.format(Date(customEnd))}"
             } else {
@@ -574,18 +802,6 @@ fun getPeriodBounds(
             cal.set(Calendar.MINUTE, 0)
             cal.set(Calendar.SECOND, 0)
             val start = cal.timeInMillis
-            cal.set(Calendar.HOUR_OF_DAY, 23)
-            cal.set(Calendar.MINUTE, 59)
-            cal.set(Calendar.SECOND, 59)
-            Pair(start, cal.timeInMillis)
-        }
-        ReportType.WEEKLY -> {
-            cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
-            cal.set(Calendar.HOUR_OF_DAY, 0)
-            cal.set(Calendar.MINUTE, 0)
-            cal.set(Calendar.SECOND, 0)
-            val start = cal.timeInMillis
-            cal.add(Calendar.DAY_OF_YEAR, 6)
             cal.set(Calendar.HOUR_OF_DAY, 23)
             cal.set(Calendar.MINUTE, 59)
             cal.set(Calendar.SECOND, 59)

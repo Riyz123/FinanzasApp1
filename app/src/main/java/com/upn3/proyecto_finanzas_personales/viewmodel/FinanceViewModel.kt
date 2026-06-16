@@ -57,7 +57,11 @@ data class FinanceState(
     val selectedTab: Int = 0, // 0: Todas, 1: Gastos, 2: Ingresos, 3: Transferencias, 4: Conversiones
     val filteredTransactions: List<Transaction> = emptyList(),
     val auditLogs: List<AuditLog> = emptyList(),
-    val isLoadingAuditLogs: Boolean = false
+    val isLoadingAuditLogs: Boolean = false,
+    val budgets: List<com.upn3.proyecto_finanzas_personales.model.Budget> = emptyList(),
+    val savingsGoals: List<com.upn3.proyecto_finanzas_personales.model.SavingsGoal> = emptyList(),
+    val fixedExpenses: List<com.upn3.proyecto_finanzas_personales.model.FixedExpense> = emptyList(),
+    val isLoadingBudgets: Boolean = false
 )
 
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
@@ -537,22 +541,32 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
                     pageTxs.forEachIndexed { ri, tx ->
                         cv.drawRect(android.graphics.RectF(M, y, W.toFloat() - M, y + rowH), mkFill(if (ri % 2 == 0) grayAlt else white))
-                        val txColor = when(tx.type) {
-                            TransactionType.INCOME   -> android.graphics.Color.parseColor("#065F46")
-                            TransactionType.EXPENSE  -> android.graphics.Color.parseColor("#991B1B")
-                            TransactionType.TRANSFER -> android.graphics.Color.parseColor("#3730A3")
+                        val isConversion = tx.origin == "Ajuste de Moneda"
+                        val txColor = when {
+                            isConversion                       -> android.graphics.Color.parseColor("#6B21A8")
+                            tx.type == TransactionType.INCOME  -> android.graphics.Color.parseColor("#065F46")
+                            tx.type == TransactionType.EXPENSE -> android.graphics.Color.parseColor("#991B1B")
+                            else                               -> android.graphics.Color.parseColor("#3730A3")
                         }
-                        val typeStr = when(tx.type) {
-                            TransactionType.INCOME -> "Ingreso"; TransactionType.EXPENSE -> "Gasto"; TransactionType.TRANSFER -> "Transfer."
+                        val typeStr = when {
+                            isConversion                       -> "Conversión"
+                            tx.type == TransactionType.INCOME  -> "Ingreso"
+                            tx.type == TransactionType.EXPENSE -> "Gasto"
+                            else                               -> "Transfer."
                         }
-                        val pfx = when(tx.type) { TransactionType.INCOME -> "+"; TransactionType.EXPENSE -> "-"; else -> "" }
+                        val pfx = when {
+                            isConversion || tx.type == TransactionType.TRANSFER -> ""
+                            tx.type == TransactionType.INCOME  -> "+"
+                            else                               -> "-"
+                        }
                         val ty = y + rowH - 4f
                         cp.color = grayText
                         cv.drawText(dateFmt.format(java.util.Date(tx.timestamp)), colX[0] + 2f, ty, cp)
                         cv.drawText(truncate(tx.description, cp, colDescW - 6f), colX[1] + 2f, ty, cp)
                         cv.drawText(truncate(tx.origin, cp, colCatW - 6f), colX[2] + 2f, ty, cp)
                         cp.color = txColor; cv.drawText(typeStr, colX[3] + 2f, ty, cp)
-                        ap.color = txColor; cv.drawText("$pfx${String.format("%.2f", tx.amount)}", colX[4] + 2f, ty, ap)
+                        val txSym = getCurrencySymbol(tx.currencyCode)
+                        ap.color = txColor; cv.drawText("$pfx$txSym${String.format("%.2f", tx.amount)}", colX[4] + 2f, ty, ap)
                         cv.drawLine(M, y + rowH, W.toFloat() - M, y + rowH, mkLine())
                         y += rowH
                     }
@@ -612,12 +626,23 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 sb.appendLine("\"--- DETALLE DE MOVIMIENTOS ---\"")
                 sb.appendLine("\"Fecha\",\"Descripción\",\"Categoría/Origen\",\"Tipo\",\"Signo\",\"Monto\",\"Moneda\"")
                 transactions.forEach { tx ->
-                    val typeStr = when(tx.type) { TransactionType.INCOME -> "Ingreso"; TransactionType.EXPENSE -> "Gasto"; TransactionType.TRANSFER -> "Transferencia" }
-                    val sign = when(tx.type) { TransactionType.INCOME -> "+"; TransactionType.EXPENSE -> "-"; else -> "" }
+                    val isConversion = tx.origin == "Ajuste de Moneda"
+                    val typeStr = when {
+                        isConversion                       -> "Conversión"
+                        tx.type == TransactionType.INCOME  -> "Ingreso"
+                        tx.type == TransactionType.EXPENSE -> "Gasto"
+                        else                               -> "Transferencia"
+                    }
+                    val sign = when {
+                        isConversion || tx.type == TransactionType.TRANSFER -> ""
+                        tx.type == TransactionType.INCOME  -> "+"
+                        else                               -> "-"
+                    }
+                    val txSymbol = if (isConversion) getCurrencySymbol(tx.currencyCode) else currencySymbol
                     val date = dateFmt.format(java.util.Date(tx.timestamp))
                     val desc = tx.description.replace("\"", "\"\"")
                     val origin = tx.origin.replace("\"", "\"\"")
-                    sb.appendLine("\"$date\",\"$desc\",\"$origin\",\"$typeStr\",\"$sign\",\"${String.format("%.2f", tx.amount)}\",\"$currencySymbol\"")
+                    sb.appendLine("\"$date\",\"$desc\",\"$origin\",\"$typeStr\",\"$sign\",\"${String.format("%.2f", tx.amount)}\",\"$txSymbol\"")
                 }
                 sb.appendLine()
                 sb.appendLine("\"\",\"\",\"\",\"\",\"Total Ingresos:\",\"${String.format("%.2f", totalIncome)}\",\"$currencySymbol\"")
@@ -1325,6 +1350,124 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             "CLP" -> "CLP$"
             "BRL" -> "R$"
             else -> "S/."
+        }
+    }
+
+    // ── FASE 1: Presupuestos, Metas y Gastos Fijos ────────────────────────────
+
+    fun loadPlanningData() {
+        val email = uiState.value.currentUser?.email ?: return
+        _uiState.update { it.copy(isLoadingBudgets = true) }
+        viewModelScope.launch {
+            try {
+                val budgets = db.collection("users").document(email).collection("budgets")
+                    .get().await().documents.mapNotNull { it.toObject(com.upn3.proyecto_finanzas_personales.model.Budget::class.java) }
+                val goals = db.collection("users").document(email).collection("savings_goals")
+                    .get().await().documents.mapNotNull { it.toObject(com.upn3.proyecto_finanzas_personales.model.SavingsGoal::class.java) }
+                val fixed = db.collection("users").document(email).collection("fixed_expenses")
+                    .get().await().documents.mapNotNull { it.toObject(com.upn3.proyecto_finanzas_personales.model.FixedExpense::class.java) }
+                _uiState.update { it.copy(budgets = budgets, savingsGoals = goals, fixedExpenses = fixed, isLoadingBudgets = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoadingBudgets = false) }
+            }
+        }
+    }
+
+    fun addBudget(budget: com.upn3.proyecto_finanzas_personales.model.Budget) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("budgets").document(budget.id).set(budget).await()
+                _uiState.update { it.copy(budgets = it.budgets + budget) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al guardar presupuesto: ${e.message}") }
+            }
+        }
+    }
+
+    fun deleteBudget(id: String) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("budgets").document(id).delete().await()
+                _uiState.update { it.copy(budgets = it.budgets.filter { b -> b.id != id }) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al eliminar presupuesto: ${e.message}") }
+            }
+        }
+    }
+
+    fun addSavingsGoal(goal: com.upn3.proyecto_finanzas_personales.model.SavingsGoal) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("savings_goals").document(goal.id).set(goal).await()
+                _uiState.update { it.copy(savingsGoals = it.savingsGoals + goal) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al guardar meta: ${e.message}") }
+            }
+        }
+    }
+
+    fun addDepositToGoal(goalId: String, amount: Double) {
+        val email = uiState.value.currentUser?.email ?: return
+        val goal = uiState.value.savingsGoals.find { it.id == goalId } ?: return
+        val updated = goal.copy(currentAmount = (goal.currentAmount + amount).coerceAtMost(goal.targetAmount))
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("savings_goals").document(goalId).set(updated).await()
+                _uiState.update { state -> state.copy(savingsGoals = state.savingsGoals.map { if (it.id == goalId) updated else it }) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al actualizar meta: ${e.message}") }
+            }
+        }
+    }
+
+    fun deleteSavingsGoal(id: String) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("savings_goals").document(id).delete().await()
+                _uiState.update { it.copy(savingsGoals = it.savingsGoals.filter { g -> g.id != id }) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al eliminar meta: ${e.message}") }
+            }
+        }
+    }
+
+    fun addFixedExpense(expense: com.upn3.proyecto_finanzas_personales.model.FixedExpense) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("fixed_expenses").document(expense.id).set(expense).await()
+                _uiState.update { it.copy(fixedExpenses = it.fixedExpenses + expense) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al guardar gasto fijo: ${e.message}") }
+            }
+        }
+    }
+
+    fun toggleFixedExpense(id: String, isActive: Boolean) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("fixed_expenses").document(id).update("isActive", isActive).await()
+                _uiState.update { state -> state.copy(fixedExpenses = state.fixedExpenses.map { if (it.id == id) it.copy(isActive = isActive) else it }) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al actualizar gasto fijo: ${e.message}") }
+            }
+        }
+    }
+
+    fun deleteFixedExpense(id: String) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("fixed_expenses").document(id).delete().await()
+                _uiState.update { it.copy(fixedExpenses = it.fixedExpenses.filter { e -> e.id != id }) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al eliminar gasto fijo: ${e.message}") }
+            }
         }
     }
 

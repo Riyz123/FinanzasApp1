@@ -40,7 +40,8 @@ import android.util.Log
 @Composable
 fun ProfileScreen(
     viewModel: FinanceViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToBudgets: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val user = uiState.currentUser
@@ -203,6 +204,31 @@ fun ProfileScreen(
                 // ── Apariencia ────────────────────────────────────────────────
                 ProfileSection(title = "Apariencia", icon = Icons.Default.Palette) {
                     ThemeSelector(currentTheme = uiState.selectedTheme, onThemeSelected = { viewModel.selectTheme(it) }, showLabel = false)
+                }
+
+                // ── Planificación ─────────────────────────────────────────────
+                ProfileSection(title = "Planificación Financiera", icon = Icons.Default.AccountBalance) {
+                    Surface(
+                        onClick = onNavigateToBudgets,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.PieChart, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                Column {
+                                    Text("Presupuestos & Metas", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text("Límites de gasto, ahorro y gastos fijos", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
 
                 // ── Datos ─────────────────────────────────────────────────────

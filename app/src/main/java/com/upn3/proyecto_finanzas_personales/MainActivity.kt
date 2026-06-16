@@ -104,6 +104,13 @@ fun FinanceApp(financeViewModel: FinanceViewModel) {
         composable("profile") {
             ProfileScreen(
                 viewModel = financeViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToBudgets = { navController.navigate("budgets") }
+            )
+        }
+        composable("budgets") {
+            com.upn3.proyecto_finanzas_personales.ui.budget.BudgetScreen(
+                viewModel = financeViewModel,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
