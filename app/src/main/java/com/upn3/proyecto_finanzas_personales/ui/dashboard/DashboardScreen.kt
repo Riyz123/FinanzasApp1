@@ -37,6 +37,7 @@ import com.upn3.proyecto_finanzas_personales.model.Wallet
 import com.upn3.proyecto_finanzas_personales.ui.components.ConversionDetailDialog
 import com.upn3.proyecto_finanzas_personales.ui.components.NumericKeyboard
 import com.upn3.proyecto_finanzas_personales.ui.components.TransactionDetailDialog
+import com.upn3.proyecto_finanzas_personales.ui.theme.AppTheme
 import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -329,6 +330,8 @@ fun DashboardScreen(
                                         viewModel.clearError()
                                     },
                                     onSelect = { viewModel.selectWallet(wallet) },
+                                    isSelected = wallet.id == uiState.selectedWallet?.id,
+                                    isLightTheme = uiState.selectedTheme == AppTheme.LIGHT,
                                     incomeTotal = uiState.chartIncome,
                                     expenseTotal = uiState.chartExpense,
                                     modifier = Modifier.fillMaxWidth()
@@ -1877,6 +1880,8 @@ private fun WalletHeroCard(
     onEditClick: () -> Unit,
     onBalanceEditClick: () -> Unit,
     onSelect: () -> Unit,
+    isSelected: Boolean = false,
+    isLightTheme: Boolean = false,
     incomeTotal: Double,
     expenseTotal: Double,
     modifier: Modifier = Modifier
@@ -1890,9 +1895,11 @@ private fun WalletHeroCard(
     }
     Card(
         onClick = onSelect,
-        modifier = modifier.height(190.dp),
+        modifier = modifier
+            .height(190.dp)
+            .then(if (isSelected) Modifier.border(2.dp, if (isLightTheme) Color.Black.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.85f), RoundedCornerShape(24.dp)) else Modifier),
         shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 12.dp else 8.dp)
     ) {
         Box(
             modifier = Modifier

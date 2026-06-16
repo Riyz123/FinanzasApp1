@@ -289,20 +289,48 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun exportTransactionsToCsv(uri: Uri, password: String?, context: android.content.Context) {
+    fun exportData(uri: Uri, password: String?, context: android.content.Context) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val csvHeader = "id,walletId,amount,description,origin,type,timestamp\n"
-                val csvData = allTransactions.joinToString("\n") { 
-                    "${it.id},${it.walletId},${it.amount},${it.description.replace(",", ";")},${it.origin},${it.type},${it.timestamp}"
+                val user = uiState.value.currentUser
+                val exportDate = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+                val backupMap = mapOf(
+                    "meta" to mapOf(
+                        "version" to "2.0",
+                        "exportDate" to exportDate,
+                        "userName" to "${user?.name ?: ""} ${user?.lastname ?: ""}".trim(),
+                        "totalTransactions" to allTransactions.size,
+                        "totalWallets" to allWallets.size,
+                        "totalCategories" to allCategories.size
+                    ),
+                    "wallets" to allWallets,
+                    "categories" to allCategories,
+                    "transactions" to allTransactions
+                )
+                val json = Gson().toJson(backupMap)
+
+                val finalData = if (!password.isNullOrBlank()) {
+                    val saltBytes = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+                    val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
+                    val keySpec = PBEKeySpec(password.toCharArray(), saltBytes, 65536, 256)
+                    val secret = SecretKeySpec(factory.generateSecret(keySpec).encoded, "AES")
+                    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                    cipher.init(Cipher.ENCRYPT_MODE, secret)
+                    val iv = cipher.parameters.getParameterSpec(IvParameterSpec::class.java).iv
+                    val encrypted = cipher.doFinal(json.toByteArray(Charsets.UTF_8))
+                    Gson().toJson(mapOf(
+                        "encrypted" to true,
+                        "salt" to Base64.encodeToString(saltBytes, Base64.NO_WRAP),
+                        "iv" to Base64.encodeToString(iv, Base64.NO_WRAP),
+                        "data" to Base64.encodeToString(encrypted, Base64.NO_WRAP)
+                    ))
+                } else {
+                    json
                 }
-                val fullCsv = csvHeader + csvData
-                val finalData = if (!password.isNullOrBlank()) encryptData(fullCsv, password) else fullCsv
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(finalData.toByteArray())
-                }
+
+                context.contentResolver.openOutputStream(uri)?.use { it.write(finalData.toByteArray(Charsets.UTF_8)) }
                 withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(errorMessage = "Exportación exitosa") }
+                    _uiState.update { it.copy(errorMessage = "EXPORT_OK:${allTransactions.size}:${allWallets.size}") }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -312,73 +340,71 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun importTransactionsFromCsv(uri: Uri, password: String?, context: android.content.Context) {
+    fun importData(uri: Uri, password: String?, context: android.content.Context) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: return@launch
-                val decryptedContent = if (!password.isNullOrBlank()) decryptData(content, password) else content
-                val lines = decryptedContent.lines()
-                if (lines.isEmpty()) return@launch
-                val transactions = mutableListOf<Transaction>()
-                lines.drop(1).forEach { line ->
-                    if (line.isBlank()) return@forEach
-                    val parts = line.split(",")
-                    if (parts.size >= 7) {
-                        transactions.add(Transaction(
-                            id = parts[0],
-                            walletId = parts[1],
-                            amount = parts[2].toDoubleOrNull() ?: 0.0,
-                            description = parts[3].replace(";", ","),
-                            origin = parts[4],
-                            type = try { TransactionType.valueOf(parts[5]) } catch(e:Exception) { TransactionType.EXPENSE },
-                            timestamp = parts[6].toLongOrNull() ?: System.currentTimeMillis()
-                        ))
-                    }
-                }
-                if (transactions.isEmpty()) throw Exception("No se encontraron transacciones válidas")
+                val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    ?: throw Exception("No se pudo leer el archivo")
+
+                val outer = com.google.gson.JsonParser.parseString(content).asJsonObject
+                val json = if (outer.has("encrypted") && outer.get("encrypted").asBoolean) {
+                    if (password.isNullOrBlank()) throw Exception("NEEDS_PASSWORD")
+                    val saltBytes = Base64.decode(outer.get("salt").asString, Base64.NO_WRAP)
+                    val iv = Base64.decode(outer.get("iv").asString, Base64.NO_WRAP)
+                    val encrypted = Base64.decode(outer.get("data").asString, Base64.NO_WRAP)
+                    val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
+                    val keySpec = PBEKeySpec(password.toCharArray(), saltBytes, 65536, 256)
+                    val secret = SecretKeySpec(factory.generateSecret(keySpec).encoded, "AES")
+                    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                    cipher.init(Cipher.DECRYPT_MODE, secret, IvParameterSpec(iv))
+                    String(cipher.doFinal(encrypted), Charsets.UTF_8)
+                } else content
+
+                val backup = com.google.gson.JsonParser.parseString(json).asJsonObject
+                val gson = Gson()
                 val userEmail = uiState.value.currentUser?.email ?: return@launch
+
+                val transactions = backup.getAsJsonArray("transactions")
+                    ?.map { gson.fromJson(it, Transaction::class.java) } ?: emptyList()
+                val wallets = backup.getAsJsonArray("wallets")
+                    ?.map { gson.fromJson(it, Wallet::class.java) } ?: emptyList()
+                val categories = backup.getAsJsonArray("categories")
+                    ?.map { gson.fromJson(it, Category::class.java) } ?: emptyList()
+
+                if (transactions.isEmpty() && wallets.isEmpty()) throw Exception("Archivo vacío o formato inválido")
+
                 transactions.chunked(500).forEach { chunk ->
                     val batch = db.batch()
-                    chunk.forEach { transaction ->
-                        val docRef = db.collection("users").document(userEmail).collection("transactions").document(transaction.id)
-                        batch.set(docRef, transaction)
+                    chunk.forEach { t ->
+                        batch.set(db.collection("users").document(userEmail).collection("transactions").document(t.id), t)
                     }
                     batch.commit().await()
                 }
-                loadTransactions()
+                wallets.chunked(500).forEach { chunk ->
+                    val batch = db.batch()
+                    chunk.forEach { w ->
+                        batch.set(db.collection("users").document(userEmail).collection("wallets").document(w.id), w)
+                    }
+                    batch.commit().await()
+                }
+                categories.chunked(500).forEach { chunk ->
+                    val batch = db.batch()
+                    chunk.forEach { c ->
+                        batch.set(db.collection("users").document(userEmail).collection("categories").document(c.id), c)
+                    }
+                    batch.commit().await()
+                }
+
+                loadTransactions(); loadWallets(); loadCategories()
                 withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(errorMessage = "Importación exitosa: ${transactions.size} registros") }
+                    _uiState.update { it.copy(errorMessage = "IMPORT_OK:${transactions.size}:${wallets.size}") }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(errorMessage = "Error al importar: ${e.message}") }
+                    _uiState.update { it.copy(errorMessage = if (e.message == "NEEDS_PASSWORD") "NEEDS_PASSWORD" else "Error al importar: ${e.message}") }
                 }
             }
         }
-    }
-
-    private fun encryptData(data: String, password: String): String {
-        val salt = "finance_app_salt".toByteArray()
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
-        val spec = PBEKeySpec(password.toCharArray(), salt, 65536, 128)
-        val secret = SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.ENCRYPT_MODE, secret)
-        val iv = cipher.parameters.getParameterSpec(IvParameterSpec::class.java).iv
-        return Base64.encodeToString(iv + cipher.doFinal(data.toByteArray(Charsets.UTF_8)), Base64.DEFAULT)
-    }
-
-    private fun decryptData(encryptedData: String, password: String): String {
-        val combined = Base64.decode(encryptedData, Base64.DEFAULT)
-        val iv = combined.sliceArray(0 until 16)
-        val ciphertext = combined.sliceArray(16 until combined.size)
-        val salt = "finance_app_salt".toByteArray()
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
-        val spec = PBEKeySpec(password.toCharArray(), salt, 65536, 128)
-        val secret = SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.DECRYPT_MODE, secret, IvParameterSpec(iv))
-        return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
     }
 
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
