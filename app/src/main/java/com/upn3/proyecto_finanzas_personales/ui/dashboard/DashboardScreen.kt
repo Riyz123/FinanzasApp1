@@ -9,6 +9,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.*
@@ -37,6 +40,7 @@ import com.upn3.proyecto_finanzas_personales.ui.components.TransactionDetailDial
 import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.snapshotFlow
 import java.util.*
 import androidx.compose.foundation.clickable
 import android.net.Uri
@@ -49,7 +53,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import com.yalantis.ucrop.UCrop
 import java.io.File
-@OptIn(ExperimentalMaterial3Api::class)
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(
     viewModel: FinanceViewModel,
@@ -153,76 +164,89 @@ fun DashboardScreen(
             isRefreshing = true
             viewModel.loadWallets()
             viewModel.loadTransactions()
-            delay(1000) // Simular un pequeño retraso para el feedback visual
+            delay(1000)
             isRefreshing = false
         }
     }
 
+    val pageCount = uiState.wallets.size + 1
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { pageCount })
+
+    // Sincronizar el Pager con la billetera seleccionada (ViewModel -> UI)
+    LaunchedEffect(uiState.selectedWallet?.id) {
+        val idx = uiState.wallets.indexOfFirst { it.id == uiState.selectedWallet?.id }
+        if (idx >= 0 && idx != pagerState.currentPage) {
+            pagerState.animateScrollToPage(idx)
+        }
+    }
+
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Column {
-                        Text(
-                            text = "Hola, ${currentUser?.name ?: "Usuario"}",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = uiState.selectedWallet?.name ?: "Cargando...",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.logout(onLogout) }) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar Sesión")
-                    }
-                }
-            )
-        },
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = true,
-                    onClick = { /* Ya estamos aquí */ },
-                    icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
-                    label = { Text("Panel", fontSize = 10.sp, maxLines = 1) }
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp
+            ) {
+                val navColors = NavigationBarItemDefaults.colors(
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 NavigationBarItem(
-                    selected = false,
-                    onClick = { onNavigateToCategories() },
-                    icon = { Icon(Icons.Default.Category, contentDescription = null) },
-                    label = { Text("Categorías", fontSize = 10.sp, maxLines = 1) }
+                    selected = true,
+                    onClick = {},
+                    icon = { Icon(Icons.Default.Home, null) },
+                    label = { Text("Inicio", fontSize = 10.sp) },
+                    colors = navColors
                 )
                 NavigationBarItem(
                     selected = false,
                     onClick = onNavigateToReports,
-                    icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
-                    label = { Text("Reportes", fontSize = 10.sp, maxLines = 1) }
+                    icon = { Icon(Icons.Default.BarChart, null) },
+                    label = { Text("Reportes", fontSize = 10.sp) },
+                    colors = navColors
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onNavigateToTransactions,
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp))
+                        }
+                    },
+                    label = { Text("") },
+                    alwaysShowLabel = false,
+                    colors = navColors
                 )
                 NavigationBarItem(
                     selected = false,
                     onClick = { showGlobalBalanceDialog = true },
-                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null) },
-                    label = { Text("Global", fontSize = 10.sp, maxLines = 1) }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { showTransferDialog = true },
-                    icon = { Icon(Icons.Default.SwapHoriz, contentDescription = null) },
-                    label = { Text("Transferir", fontSize = 10.sp, maxLines = 1) }
+                    icon = { Icon(Icons.Default.AccountBalanceWallet, null) },
+                    label = { Text("Global", fontSize = 10.sp) },
+                    colors = navColors
                 )
                 NavigationBarItem(
                     selected = false,
                     onClick = onNavigateToProfile,
-                    icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    label = { Text("Perfil", fontSize = 10.sp, maxLines = 1) }
+                    icon = {
+                        val pic = uiState.currentUser?.profilePicture
+                        if (!pic.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = pic, contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(26.dp).clip(CircleShape)
+                            )
+                        } else { Icon(Icons.Default.Person, null) }
+                    },
+                    label = { Text("Perfil", fontSize = 10.sp) },
+                    colors = navColors
                 )
-            }
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onNavigateToTransactions) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir Transacción")
             }
         }
     ) { padding ->
@@ -230,289 +254,252 @@ fun DashboardScreen(
             state = pullToRefreshState,
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier = Modifier.fillMaxSize().padding(padding)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-            ) {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+
+                // ── 1. Greeting header ────────────────────────────────────────────
                 item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Wallet Selector / Carousel
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 8.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        items(uiState.wallets, key = { it.id }) { wallet ->
-                            val isSelected = wallet.id == uiState.selectedWallet?.id
-                            Card(
-                                onClick = { viewModel.selectWallet(wallet) },
-                                modifier = Modifier.width(200.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isSelected) Color(wallet.color) else MaterialTheme.colorScheme.surfaceVariant
-                                ),
-                                elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 2.dp)
+                        Column {
+                            Text(
+                                dashboardGreeting(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                currentUser?.name ?: "Usuario",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                onClick = { showTransferDialog = true },
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.size(40.dp)
                             ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        wallet.name, 
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        "${viewModel.getCurrencySymbol(wallet.currencyCode)} ${String.format("%.2f", wallet.balance)}",
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (isSelected) {
-                                        IconButton(
-                                            onClick = { 
-                                                editingWallet = wallet
-                                                showEditWalletDialog = true 
-                                            },
-                                            modifier = Modifier.align(Alignment.End).size(24.dp)
-                                        ) {
-                                            Icon(Icons.Default.Settings, contentDescription = "Editar Billetera", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Icon(Icons.Default.SwapHoriz, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Surface(
+                                onClick = { viewModel.logout(onLogout) },
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Icon(Icons.AutoMirrored.Filled.ExitToApp, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── 2. Wallet hero cards (HorizontalPager) ────────────────────────
+                item {
+                    Column {
+                        HorizontalPager(
+                            state = pagerState,
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                            pageSpacing = 16.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { page ->
+                            if (page < uiState.wallets.size) {
+                                val wallet = uiState.wallets[page]
+                                WalletHeroCard(
+                                    wallet = wallet,
+                                    currencySymbol = viewModel.getCurrencySymbol(wallet.currencyCode),
+                                    onEditClick = { editingWallet = wallet; showEditWalletDialog = true },
+                                    onBalanceEditClick = {
+                                        newBalanceText = wallet.balance.toString()
+                                        showEditBalanceDialog = true
+                                        viewModel.clearError()
+                                    },
+                                    onSelect = { viewModel.selectWallet(wallet) },
+                                    incomeTotal = uiState.chartIncome,
+                                    expenseTotal = uiState.chartExpense,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                Card(
+                                    onClick = { showAddWalletDialog = true },
+                                    modifier = Modifier.fillMaxWidth().height(190.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), modifier = Modifier.size(56.dp)) {
+                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                                                }
+                                            }
+                                            Text("Nueva Billetera", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
                                 }
                             }
                         }
-                        item {
-                            Card(
-                                onClick = { showAddWalletDialog = true },
-                                modifier = Modifier.width(150.dp).height(85.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                            ) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Default.Add, contentDescription = "Añadir Billetera")
-                                }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            repeat(uiState.wallets.size + 1) { index ->
+                                val isCurrent = pagerState.currentPage == index
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 3.dp)
+                                        .size(if (isCurrent) 8.dp else 5.dp)
+                                        .background(
+                                            if (isCurrent) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                            CircleShape
+                                        )
+                                )
                             }
                         }
                     }
-
                     Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                }
+
+                // ── 3. Quick stats row ────────────────────────────────────────────
+                item {
+                    val sym = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN")
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("Saldo de ${uiState.selectedWallet?.name ?: "Billetera"}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN")} ${String.format("%.2f", uiState.balance)}",
-                                    style = MaterialTheme.typography.displayMedium,
-                                    fontWeight = FontWeight.ExtraBold,
+                        DashboardStatCard(
+                            icon = Icons.AutoMirrored.Filled.TrendingUp, label = "Ingresos",
+                            amount = "$sym ${String.format("%.2f", uiState.chartIncome)}",
+                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f)
+                        )
+                        DashboardStatCard(
+                            icon = Icons.AutoMirrored.Filled.TrendingDown, label = "Gastos",
+                            amount = "$sym ${String.format("%.2f", uiState.chartExpense)}",
+                            color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // ── 4. Statistics section ─────────────────────────────────────────
+                item {
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        StatisticsSection(
+                            transactions = uiState.convertedTransactions,
+                            currencySymbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN"),
+                            selectedWalletId = uiState.selectedWallet?.id,
+                            getCurrencySymbol = viewModel::getCurrencySymbol,
+                            generalIncome = uiState.chartIncome,
+                            generalExpense = uiState.chartExpense
+                        )
+                    }
+                }
+
+                // ── 5. Transaction header + search + tabs ─────────────────────────
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp).padding(top = 24.dp, bottom = 8.dp)) {
+                        Text("Movimientos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.updateSearchQuery(it) },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Buscar...") },
+                            leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(20.dp)) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                        Icon(Icons.Default.Close, null, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        SecondaryScrollableTabRow(
+                            selectedTabIndex = selectedTab,
+                            edgePadding = 0.dp,
+                            containerColor = Color.Transparent,
+                            divider = {},
+                            indicator = {
+                                TabRowDefaults.SecondaryIndicator(
+                                    Modifier.tabIndicatorOffset(selectedTab),
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                IconButton(onClick = {
-                                    newBalanceText = uiState.balance.toString()
-                                    showEditBalanceDialog = true
-                                    viewModel.clearError()
-                                }) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Editar Saldo")
-                                }
+                            }
+                        ) {
+                            listOf("Todos", "Gastos", "Ingresos", "Transferencias", "Conversiones").forEachIndexed { index, label ->
+                                Tab(selected = selectedTab == index, onClick = { viewModel.updateSelectedTab(index) }, text = { Text(label) })
                             }
                         }
                     }
                 }
 
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StatisticsSection(
-                        transactions = uiState.convertedTransactions,
-                        currencySymbol = viewModel.getCurrencySymbol(
-                            uiState.selectedWallet?.currencyCode ?: "PEN"
-                        ),
-                        selectedWalletId = uiState.selectedWallet?.id,
-                        getCurrencySymbol = viewModel::getCurrencySymbol,
-                        generalIncome = uiState.chartIncome,
-                        generalExpense = uiState.chartExpense
-                    )
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text("Transacciones", style = MaterialTheme.typography.titleLarge)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { viewModel.updateSearchQuery(it) },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Buscar por nombre, categoría o tipo...") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Limpiar")
-                                }
+                // ── 6. Transaction items ──────────────────────────────────────────
+                if (filteredTransactions.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Inbox, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+                                Text("Sin movimientos", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                             }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    SecondaryScrollableTabRow(
-                        selectedTabIndex = selectedTab,
-                        edgePadding = 0.dp,
-                        containerColor = Color.Transparent,
-                        divider = {},
-                        indicator = {
-                            TabRowDefaults.SecondaryIndicator(
-                                Modifier.tabIndicatorOffset(selectedTab),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    ) {
-                        Tab(selected = selectedTab == 0, onClick = { viewModel.updateSelectedTab(0) }) {
-                            Text("Todos", modifier = Modifier.padding(12.dp))
-                        }
-                        Tab(selected = selectedTab == 1, onClick = { viewModel.updateSelectedTab(1) }) {
-                            Text("Gastos", modifier = Modifier.padding(12.dp))
-                        }
-                        Tab(selected = selectedTab == 2, onClick = { viewModel.updateSelectedTab(2) }) {
-                            Text("Ingresos", modifier = Modifier.padding(12.dp))
-                        }
-                        Tab(selected = selectedTab == 3, onClick = { viewModel.updateSelectedTab(3) }) {
-                            Text("Transferencias", modifier = Modifier.padding(12.dp))
-                        }
-                        Tab(selected = selectedTab == 4, onClick = { viewModel.updateSelectedTab(4) }) {
-                            Text("Conversiones", modifier = Modifier.padding(12.dp))
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                items(filteredTransactions, key = { it.id }) { transaction ->
-                    ListItem(
-                        modifier = Modifier.clickable {
-
-                            if (transaction.origin == "Ajuste de Moneda") {
-
-                                selectedConversion = transaction
-                                showConversionDialog = true
-
-                            } else {
-
-                                selectedCategoryIcon = uiState.categories
-                                    .find { it.name == transaction.origin }?.icon ?: "Category"
-                                selectedTransactionDetail = transaction
-                                showTransactionDetailDialog = true
-
-                            }
-                        },
-                        headlineContent = { Text(transaction.description) },
-                        supportingContent = {
-                            Column {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    val icon = when(transaction.type) {
-                                        TransactionType.INCOME -> Icons.Default.ArrowUpward
-                                        TransactionType.EXPENSE -> Icons.Default.ArrowDownward
-                                        TransactionType.TRANSFER -> Icons.Default.SwapHoriz
-                                    }
-                                    val color = when(transaction.type) {
-                                        TransactionType.INCOME -> MaterialTheme.colorScheme.primary
-                                        TransactionType.EXPENSE -> MaterialTheme.colorScheme.error
-                                        TransactionType.TRANSFER -> MaterialTheme.colorScheme.secondary
-                                    }
-                                    Icon(
-                                        icon,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(14.dp),
-                                        tint = color
-                                    )
-                                    Text(transaction.origin)
-                                }
-
+                } else {
+                    items(filteredTransactions, key = { it.id }) { transaction ->
+                        PremiumTransactionItem(
+                            transaction = transaction,
+                            categories = uiState.categories,
+                            viewModel = viewModel,
+                            onItemClick = {
                                 if (transaction.origin == "Ajuste de Moneda") {
-                                    Text(
-                                        text = java.text.SimpleDateFormat(
-                                            "dd/MM/yyyy HH:mm",
-                                            java.util.Locale.getDefault()
-                                        ).format(java.util.Date(transaction.timestamp)),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    selectedConversion = transaction
+                                    showConversionDialog = true
+                                } else {
+                                    selectedCategoryIcon = uiState.categories.find { it.name == transaction.origin }?.icon ?: "Category"
+                                    selectedTransactionDetail = transaction
+                                    showTransactionDetailDialog = true
                                 }
-                            }
-                        },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val prefix = when {
-                                    transaction.origin == "Sistema" || transaction.description.contains("Ajuste", ignoreCase = true) -> ""
-                                    transaction.type == TransactionType.INCOME -> "+"
-                                    transaction.type == TransactionType.EXPENSE -> "-"
-                                    transaction.type == TransactionType.TRANSFER -> "⇄"
-                                    else -> ""
-                                }
-                                val color = when(transaction.type) {
-                                    TransactionType.INCOME -> MaterialTheme.colorScheme.primary
-                                    TransactionType.EXPENSE -> MaterialTheme.colorScheme.error
-                                    TransactionType.TRANSFER -> MaterialTheme.colorScheme.secondary
-                                }
-                                val symbol = viewModel.getCurrencySymbol(transaction.currencyCode)
+                            },
+                            onEditClick = {
+                                editingTransaction = transaction
+                                editAmount = transaction.amount.toString()
+                                editDescription = transaction.description
+                                editCategory = uiState.categories.find { it.name == transaction.origin }
+                                editReceiptPath = transaction.receiptPath
+                                showEditTransactionDialog = true
+                                editDate = Calendar.getInstance().apply { timeInMillis = transaction.timestamp }
+                                viewModel.clearError()
+                            },
+                            onDeleteClick = { viewModel.deleteTransaction(transaction.id) }
+                        )
+                    }
+                }
 
-                                Text(
-                                    text = "$prefix $symbol${String.format("%.2f", transaction.amount)}",
-                                    color = color,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                IconButton(onClick = {
-                                    editingTransaction = transaction
-                                    editAmount = transaction.amount.toString()
-                                    editDescription = transaction.description
-                                    editCategory = uiState.categories.find { it.name == transaction.origin }
-                                    editReceiptPath = transaction.receiptPath
-                                    showEditTransactionDialog = true
-                                    editDate = Calendar.getInstance().apply { timeInMillis = transaction.timestamp }
-                                    viewModel.clearError()
-                                }) {
-                                    Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = "Editar",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                IconButton(onClick = { viewModel.deleteTransaction(transaction.id) }) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Borrar",
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        }
-                    )
-                    HorizontalDivider()
-                }
-                
-                item {
-                    Spacer(modifier = Modifier.height(80.dp)) // Espacio para que el FAB no tape la última transacción
-                }
+                item { Spacer(modifier = Modifier.height(90.dp)) }
             }
         }
     }
@@ -1010,19 +997,10 @@ fun DashboardScreen(
                                     singleLine = true
                                 )
                                 OutlinedTextField(
-                                    value = extBank,
-                                    onValueChange = { extBank = it },
-                                    label = { Text("Banco (opcional)") },
-                                    leadingIcon = { Icon(Icons.Default.AccountBalance, null, modifier = Modifier.size(18.dp)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    singleLine = true
-                                )
-                                OutlinedTextField(
                                     value = extMotivo,
                                     onValueChange = { extMotivo = it },
                                     label = { Text("Motivo (opcional)") },
-                                    leadingIcon = { Icon(Icons.Default.Notes, null, modifier = Modifier.size(18.dp)) },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null, modifier = Modifier.size(18.dp)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp),
                                     singleLine = true
@@ -1874,6 +1852,211 @@ fun StatisticsSection(    transactions: List<Transaction>,
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Premium helpers ────────────────────────────────────────────────────────────
+
+private fun dashboardGreeting(): String {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when {
+        hour < 12 -> "Buenos días,"
+        hour < 18 -> "Buenas tardes,"
+        else -> "Buenas noches,"
+    }
+}
+
+@Composable
+private fun WalletHeroCard(
+    wallet: com.upn3.proyecto_finanzas_personales.model.Wallet,
+    currencySymbol: String,
+    onEditClick: () -> Unit,
+    onBalanceEditClick: () -> Unit,
+    onSelect: () -> Unit,
+    incomeTotal: Double,
+    expenseTotal: Double,
+    modifier: Modifier = Modifier
+) {
+    val baseColor = Color(wallet.color)
+    val darkColor = remember(wallet.color) {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(wallet.color.toInt(), hsv)
+        hsv[2] = (hsv[2] * 0.55f).coerceIn(0f, 1f)
+        Color(android.graphics.Color.HSVToColor(hsv))
+    }
+    Card(
+        onClick = onSelect,
+        modifier = modifier.height(190.dp),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.linearGradient(listOf(baseColor, darkColor)))
+                .padding(20.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text(wallet.name, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Surface(shape = RoundedCornerShape(6.dp), color = Color.White.copy(alpha = 0.2f)) {
+                            Text(wallet.currencyCode, style = MaterialTheme.typography.labelSmall, color = Color.White, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    }
+                    Row {
+                        IconButton(onClick = onBalanceEditClick, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(16.dp))
+                        }
+                        IconButton(onClick = onEditClick, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Settings, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+                Column {
+                    Text("Saldo disponible", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                    Text(
+                        "$currencySymbol ${String.format("%.2f", wallet.balance)}",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Default.ArrowUpward, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(13.dp))
+                        Text("$currencySymbol ${String.format("%.2f", incomeTotal)}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Default.ArrowDownward, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(13.dp))
+                        Text("$currencySymbol ${String.format("%.2f", expenseTotal)}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardStatCard(icon: ImageVector, label: String, amount: String, color: Color, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = CircleShape, color = color.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+                }
+            }
+            Column {
+                Text(label, style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.8f))
+                Text(amount, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = color)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PremiumTransactionItem(
+    transaction: Transaction,
+    categories: List<com.upn3.proyecto_finanzas_personales.model.Category>,
+    viewModel: com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel,
+    onItemClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    val amountColor = when {
+        transaction.type == TransactionType.INCOME -> MaterialTheme.colorScheme.primary
+        transaction.type == TransactionType.EXPENSE -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.secondary
+    }
+    val prefix = when {
+        transaction.origin == "Sistema" || transaction.description.contains("Ajuste", ignoreCase = true) -> ""
+        transaction.type == TransactionType.INCOME -> "+"
+        transaction.type == TransactionType.EXPENSE -> "-"
+        transaction.type == TransactionType.TRANSFER -> "⇄ "
+        else -> ""
+    }
+    val symbol = viewModel.getCurrencySymbol(transaction.currencyCode)
+
+    val dateStr = remember(transaction.timestamp) {
+        val now = Calendar.getInstance()
+        val txCal = Calendar.getInstance().apply { timeInMillis = transaction.timestamp }
+        val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(transaction.timestamp))
+        when {
+            txCal.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR) && txCal.get(Calendar.YEAR) == now.get(Calendar.YEAR) -> "Hoy · $time"
+            txCal.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR) - 1 && txCal.get(Calendar.YEAR) == now.get(Calendar.YEAR) -> "Ayer · $time"
+            else -> java.text.SimpleDateFormat("dd/MM/yyyy · HH:mm", java.util.Locale.getDefault()).format(java.util.Date(transaction.timestamp))
+        }
+    }
+
+    Surface(
+        onClick = onItemClick,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(46.dp).background(amountColor.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    when (transaction.type) {
+                        TransactionType.INCOME -> Icons.Default.ArrowUpward
+                        TransactionType.EXPENSE -> Icons.Default.ArrowDownward
+                        TransactionType.TRANSFER -> Icons.Default.SwapHoriz
+                    },
+                    null, tint = amountColor, modifier = Modifier.size(22.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(transaction.description, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(transaction.origin, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (!transaction.receiptPath.isNullOrBlank()) {
+                        Icon(Icons.Default.Receipt, null, modifier = Modifier.size(10.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                    }
+                    if (transaction.latitude != null) {
+                        Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(10.dp), tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f))
+                    }
+                }
+                Text(dateStr, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f))
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("$prefix$symbol${String.format("%.2f", transaction.amount)}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = amountColor)
+                Box {
+                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.MoreVert, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Editar") },
+                            leadingIcon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)) },
+                            onClick = { showMenu = false; onEditClick() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error) },
+                            onClick = { showMenu = false; onDeleteClick() }
+                        )
                     }
                 }
             }

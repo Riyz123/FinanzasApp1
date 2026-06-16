@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -55,7 +57,7 @@ fun resolveCategoryIcon(iconName: String): ImageVector = when (iconName.lowercas
     "movie", "theater" -> Icons.Filled.Movie
     "account_balance", "bank" -> Icons.Filled.AccountBalance
     "savings", "saving" -> Icons.Filled.Savings
-    "trending_up", "investment", "stocks" -> Icons.Filled.TrendingUp
+    "trending_up", "investment", "stocks" -> Icons.AutoMirrored.Filled.TrendingUp
     "attach_money", "income", "salary", "money" -> Icons.Filled.AttachMoney
     "receipt", "bill", "invoice" -> Icons.Filled.Receipt
     "flight", "travel", "trip" -> Icons.Filled.Flight
@@ -108,8 +110,8 @@ fun TransactionDetailDialog(
         TransactionType.TRANSFER -> "Transferencia"
     }
     val typeIcon = when (transaction.type) {
-        TransactionType.INCOME -> Icons.Filled.TrendingUp
-        TransactionType.EXPENSE -> Icons.Filled.TrendingDown
+        TransactionType.INCOME -> Icons.AutoMirrored.Filled.TrendingUp
+        TransactionType.EXPENSE -> Icons.AutoMirrored.Filled.TrendingDown
         TransactionType.TRANSFER -> Icons.Filled.SwapHoriz
     }
     val amountSign = when (transaction.type) {

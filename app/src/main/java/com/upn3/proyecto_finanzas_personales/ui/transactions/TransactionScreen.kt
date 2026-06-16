@@ -262,18 +262,23 @@ fun TransactionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("NUEVA TRANSACCIÓN") },
+            CenterAlignedTopAppBar(
+                title = { Text("Nueva Transacción", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver")
                     }
                 },
                 actions = {
-                    TextButton(onClick = { imagePickerLauncher.launch("image/*") }) {
-                        Text(if (selectedReceiptUri == null) "📷 VOUCHER" else "✅ VOUCHER")
+                    IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
+                        Icon(
+                            if (selectedReceiptUri == null) Icons.Default.AddAPhoto else Icons.Default.CheckCircle,
+                            null,
+                            tint = if (selectedReceiptUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -401,7 +406,7 @@ fun TransactionScreen(
 
                 // ── Categorías ────────────────────────────────────────────────
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Categoría", style = MaterialTheme.typography.labelLarge)
+                    Text("Categoría", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth(),
@@ -409,22 +414,20 @@ fun TransactionScreen(
                     ) {
                         items(filteredCategories) { category ->
                             val isSelected = selectedCategory == category
+                            val chipColor = if (type == TransactionType.INCOME) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                             Surface(
                                 onClick = { selectedCategory = category; viewModel.clearError() },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                                modifier = Modifier.height(48.dp)
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) chipColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
+                                border = if (isSelected) BorderStroke(1.5.dp, chipColor) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                                modifier = Modifier.height(40.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                Box(modifier = Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                                     Text(
                                         category.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) chipColor else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -432,17 +435,14 @@ fun TransactionScreen(
                         item {
                             Surface(
                                 onClick = onNavigateToCategories,
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                modifier = Modifier.height(48.dp)
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                                modifier = Modifier.height(40.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
-                                    Text("NUEVA", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                Row(modifier = Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+                                    Text("Nueva", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
                                 }
                             }
                         }

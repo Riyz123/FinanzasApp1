@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Brush
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
@@ -117,155 +118,135 @@ fun ProfileScreen(
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
-            TopAppBar(
-                title = { Text("CONFIGURACIÓN") },
+            CenterAlignedTopAppBar(
+                title = { Text("Mi Perfil", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 actions = {
-                    TextButton(onClick = {
-                        viewModel.updateUser(name, lastname, email, password, profilePic) {
-                            onNavigateBack()
-                        }
-                    }) {
+                    TextButton(onClick = { viewModel.updateUser(name, lastname, email, password, profilePic) { onNavigateBack() } }) {
                         if (uiState.isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
-                            Text("GUARDAR", fontWeight = FontWeight.Bold)
+                            Text("Guardar", fontWeight = FontWeight.Bold)
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(scrollState),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Foto de Perfil
+            // ── Avatar header ─────────────────────────────────────────────────
             Box(
                 modifier = Modifier
-                    .size(90.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    .clickable { launcher.launch("image/*") },
+                    .fillMaxWidth()
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), MaterialTheme.colorScheme.surface)
+                        )
+                    )
+                    .padding(vertical = 28.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (profilePic.isEmpty()) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(45.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(profilePic)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Foto de perfil",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.CameraAlt,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(modifier = Modifier.size(100.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                .clickable { launcher.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (profilePic.isEmpty()) {
+                                Text(
+                                    (name.firstOrNull() ?: "U").toString().uppercase(),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(profilePic).crossfade(true).build(),
+                                    contentDescription = "Foto de perfil",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                        }
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("$name $lastname".trim().ifBlank { "Sin nombre" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        if (email.isNotEmpty()) {
+                            Text(email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
 
-            Text(
-                "Perfil",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
-            SharedAuthTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = "Nombre",
-                icon = Icons.Default.Badge
-            )
+                // ── Información personal ──────────────────────────────────────
+                ProfileSection(title = "Información Personal", icon = Icons.Default.Person) {
+                    SharedAuthTextField(value = name, onValueChange = { name = it }, label = "Nombre", icon = Icons.Default.Badge)
+                    SharedAuthTextField(value = lastname, onValueChange = { lastname = it }, label = "Apellidos", icon = Icons.Default.Badge)
+                    SharedAuthTextField(value = email, onValueChange = { email = it }, label = "Correo Electrónico", icon = Icons.Default.Email)
+                }
 
-            SharedAuthTextField(
-                value = lastname,
-                onValueChange = { lastname = it },
-                label = "Apellidos",
-                icon = Icons.Default.Badge
-            )
+                // ── Seguridad ─────────────────────────────────────────────────
+                ProfileSection(title = "Seguridad", icon = Icons.Default.Lock) {
+                    SharedAuthTextField(value = password, onValueChange = { password = it }, label = "Nueva contraseña (dejar vacío para no cambiar)", icon = Icons.Default.Lock, isPassword = true)
+                }
 
-            SharedAuthTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = "Correo Electrónico",
-                icon = Icons.Default.Email
-            )
+                // ── Apariencia ────────────────────────────────────────────────
+                ProfileSection(title = "Apariencia", icon = Icons.Default.Palette) {
+                    ThemeSelector(currentTheme = uiState.selectedTheme, onThemeSelected = { viewModel.selectTheme(it) }, showLabel = false)
+                }
 
-            Text(
-                "Seguridad",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth()
-            )
+                // ── Datos ─────────────────────────────────────────────────────
+                ProfileSection(title = "Datos y Copia de Seguridad", icon = Icons.Default.Backup) {
+                    CsvDataManagement(viewModel)
+                }
 
-            SharedAuthTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = "Nueva Contraseña (dejar en blanco para no cambiar)",
-                icon = Icons.Default.Lock,
-                isPassword = true
-            )
+                if (uiState.errorMessage != null) {
+                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f), modifier = Modifier.fillMaxWidth()) {
+                        Text(uiState.errorMessage!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp))
+                    }
+                }
 
-            Text(
-                "Tema",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth()
-            )
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
 
-            ThemeSelector(
-                currentTheme = uiState.selectedTheme,
-                onThemeSelected = { viewModel.selectTheme(it) },
-                showLabel = false
-            )
-
-            Text(
-                "Datos y Copia de Seguridad",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            CsvDataManagement(viewModel)
-
-            if (uiState.errorMessage != null) {
-                Text(
-                    text = uiState.errorMessage!!,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
+@Composable
+private fun ProfileSection(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+        }
+        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                content()
             }
         }
     }

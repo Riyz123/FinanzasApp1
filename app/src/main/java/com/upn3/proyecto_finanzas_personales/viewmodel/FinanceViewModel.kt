@@ -411,9 +411,17 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun selectWallet(wallet: Wallet) {
-        _uiState.update { it.copy(selectedWallet = wallet) }
+        val filtered = allTransactions.filter { it.walletId == wallet.id }
+        _uiState.update { state ->
+            state.copy(
+                selectedWallet = wallet,
+                transactions = filtered.sortedByDescending { t -> t.timestamp },
+                balance = wallet.balance
+            )
+        }
         calculateGlobalBalance()
-        updateState()
+        calculateChartTotals()
+        applyFilters()
     }
 
     fun setPreferredCurrency(currencyCode: String) {
@@ -1055,7 +1063,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     private fun updateState() {
         val currentId = _uiState.value.selectedWallet?.id
-        val updatedWallet = allWallets.find { it.id == currentId } ?: allWallets.firstOrNull()
+        val updatedWallet = allWallets.find { it.id == currentId }
+            ?: _uiState.value.selectedWallet
+            ?: allWallets.firstOrNull()
         val filtered = if (updatedWallet != null) allTransactions.filter { it.walletId == updatedWallet.id } else allTransactions
         _uiState.update { it.copy(
             transactions = filtered.sortedByDescending { t -> t.timestamp },

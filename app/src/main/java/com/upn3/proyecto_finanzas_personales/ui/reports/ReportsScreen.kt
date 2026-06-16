@@ -5,14 +5,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -126,60 +130,62 @@ fun ReportsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Reportes y Calendario") },
+            CenterAlignedTopAppBar(
+                title = { Text("Reportes", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Date Selector Card
-            Box(modifier = Modifier.padding(16.dp)) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showTypeMenu = true },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+
+            // ── Date Selector ─────────────────────────────────────────────────
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Surface(
+                    onClick = { showTypeMenu = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                 ) {
                     Row(
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .fillMaxWidth(),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column {
-                            Text(
-                                text = when(reportType) {
-                                    ReportType.DAILY -> "REPORTE DIARIO"
-                                    ReportType.WEEKLY -> "REPORTE SEMANAL"
-                                    ReportType.MONTHLY -> "REPORTE MENSUAL"
-                                    ReportType.YEARLY -> "REPORTE ANUAL"
-                                    ReportType.CUSTOM -> "RANGO PERSONALIZADO"
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = getReportDateRangeText(reportType, selectedDate, customStartDate, customEndDate),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Toca para cambiar periodo o fecha",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            Column {
+                                Text(
+                                    when(reportType) {
+                                        ReportType.DAILY -> "DIARIO"
+                                        ReportType.WEEKLY -> "SEMANAL"
+                                        ReportType.MONTHLY -> "MENSUAL"
+                                        ReportType.YEARLY -> "ANUAL"
+                                        ReportType.CUSTOM -> "PERSONALIZADO"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    getReportDateRangeText(reportType, selectedDate, customStartDate, customEndDate),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
-                        Icon(Icons.Default.FilterList, contentDescription = null)
+                        Icon(Icons.Default.UnfoldMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -268,43 +274,46 @@ fun ReportsScreen(
             val totalTransfer = reportData.third
             val currentSymbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN")
 
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    ReportSummaryCard(
-                        label = "Ingresos",
-                        amount = totalIncome,
-                        color = MaterialTheme.colorScheme.primary,
-                        symbol = currentSymbol,
-                        modifier = Modifier.weight(1f)
-                    )
-                    ReportSummaryCard(
-                        label = "Gastos",
-                        amount = totalExpense,
-                        color = MaterialTheme.colorScheme.error,
-                        symbol = currentSymbol,
-                        modifier = Modifier.weight(1f)
-                    )
+            // ── Balance neto ──────────────────────────────────────────────────
+            val netBalance = totalIncome - totalExpense
+            val netPct = if (totalIncome > 0) (netBalance / totalIncome).toFloat().coerceIn(0f, 1f) else 0f
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ReportSummaryCard(label = "Ingresos", amount = totalIncome, color = MaterialTheme.colorScheme.primary, symbol = currentSymbol, icon = Icons.AutoMirrored.Filled.TrendingUp, modifier = Modifier.weight(1f))
+                    ReportSummaryCard(label = "Gastos", amount = totalExpense, color = MaterialTheme.colorScheme.error, symbol = currentSymbol, icon = Icons.AutoMirrored.Filled.TrendingDown, modifier = Modifier.weight(1f))
                 }
                 if (totalTransfer > 0) {
-                    ReportSummaryCard(
-                        label = "Transferencias",
-                        amount = totalTransfer,
-                        color = MaterialTheme.colorScheme.secondary,
-                        symbol = currentSymbol,
-                        modifier = Modifier.fillMaxWidth()
-                    )
                     Spacer(Modifier.height(8.dp))
+                    ReportSummaryCard(label = "Transferencias", amount = totalTransfer, color = MaterialTheme.colorScheme.secondary, symbol = currentSymbol, icon = Icons.Default.SwapHoriz, modifier = Modifier.fillMaxWidth())
+                }
+                Spacer(Modifier.height(10.dp))
+                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Balance neto", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "${if (netBalance >= 0) "+" else ""}$currentSymbol ${String.format("%.2f", netBalance)}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (netBalance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { netPct },
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                            color = if (netBalance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        )
+                    }
                 }
             }
 
-            // Transactions List
+            // ── Transactions list ─────────────────────────────────────────────
             Text(
-                text = "Detalle de Movimientos",
+                "Detalle de Movimientos",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.titleSmall
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
             )
 
             LazyColumn(
@@ -345,58 +354,63 @@ fun ReportTypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun ReportSummaryCard(label: String, amount: Double, color: Color, symbol: String, modifier: Modifier = Modifier) {
+fun ReportSummaryCard(label: String, amount: Double, color: Color, symbol: String, icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.BarChart, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = color)
-            Text(
-                "$symbol ${String.format("%.2f", amount)}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = color
-            )
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = color.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+                }
+            }
+            Column {
+                Text(label, style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.8f))
+                Text("$symbol ${String.format("%.2f", amount)}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = color)
+            }
         }
     }
 }
 
 @Composable
 fun TransactionReportItem(transaction: Transaction, currency: String) {
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-    val dateFormat = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
-    
-    ListItem(
-        headlineContent = { Text(transaction.description) },
-        supportingContent = { 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${dateFormat.format(Date(transaction.timestamp))} - ${timeFormat.format(Date(transaction.timestamp))}")
-                Spacer(Modifier.width(8.dp))
-                Text("• ${transaction.origin}", color = MaterialTheme.colorScheme.primary)
+    val fmt = remember { SimpleDateFormat("dd/MM · HH:mm", Locale.getDefault()) }
+    val color = when(transaction.type) {
+        TransactionType.INCOME -> MaterialTheme.colorScheme.primary
+        TransactionType.EXPENSE -> MaterialTheme.colorScheme.error
+        TransactionType.TRANSFER -> MaterialTheme.colorScheme.secondary
+    }
+    val prefix = when {
+        transaction.origin == "Sistema" || transaction.description.contains("Ajuste", ignoreCase = true) -> ""
+        transaction.type == TransactionType.INCOME -> "+"
+        transaction.type == TransactionType.EXPENSE -> "-"
+        transaction.type == TransactionType.TRANSFER -> "⇄ "
+        else -> ""
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.12f), androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
+                Icon(when(transaction.type) {
+                    TransactionType.INCOME -> Icons.Default.ArrowUpward
+                    TransactionType.EXPENSE -> Icons.Default.ArrowDownward
+                    TransactionType.TRANSFER -> Icons.Default.SwapHoriz
+                }, null, tint = color, modifier = Modifier.size(20.dp))
             }
-        },
-        trailingContent = {
-            val prefix = when {
-                transaction.origin == "Sistema" || transaction.description.contains("Ajuste", ignoreCase = true) -> ""
-                transaction.type == TransactionType.INCOME -> "+"
-                transaction.type == TransactionType.EXPENSE -> "-"
-                transaction.type == TransactionType.TRANSFER -> "⇄"
-                else -> ""
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(transaction.description, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text("${transaction.origin} · ${fmt.format(Date(transaction.timestamp))}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            val color = when(transaction.type) {
-                TransactionType.INCOME -> MaterialTheme.colorScheme.primary
-                TransactionType.EXPENSE -> MaterialTheme.colorScheme.error
-                TransactionType.TRANSFER -> MaterialTheme.colorScheme.secondary
-            }
-            Text(
-                text = "$prefix $currency ${String.format("%.2f", transaction.amount)}",
-                color = color,
-                fontWeight = FontWeight.Bold
-            )
+            Text("$prefix$currency ${String.format("%.2f", transaction.amount)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = color)
         }
-    )
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    }
 }
 
 enum class ReportType { DAILY, WEEKLY, MONTHLY, YEARLY, CUSTOM }
