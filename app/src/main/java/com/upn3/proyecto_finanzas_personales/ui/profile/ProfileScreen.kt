@@ -406,7 +406,11 @@ fun CsvDataManagement(viewModel: FinanceViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Icon(Icons.Default.Shield, null, modifier = Modifier.size(18.dp), tint = if (encryptExport) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         Column {
                             Text("Cifrar exportación", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
