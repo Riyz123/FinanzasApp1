@@ -1,6 +1,5 @@
 package com.upn3.proyecto_finanzas_personales.ui.budget
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,10 +33,12 @@ fun BudgetScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
-
     var showAddBudget by remember { mutableStateOf(false) }
     var showAddGoal by remember { mutableStateOf(false) }
     var showAddFixed by remember { mutableStateOf(false) }
+    var editBudget by remember { mutableStateOf<Budget?>(null) }
+    var editGoal by remember { mutableStateOf<SavingsGoal?>(null) }
+    var editFixed by remember { mutableStateOf<FixedExpense?>(null) }
     var depositGoal by remember { mutableStateOf<SavingsGoal?>(null) }
 
     LaunchedEffect(Unit) { viewModel.loadPlanningData() }
@@ -76,7 +77,6 @@ fun BudgetScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // ── Tabs ──────────────────────────────────────────────────────────
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -99,20 +99,26 @@ fun BudgetScreen(
             } else {
                 when (selectedTab) {
                     0 -> BudgetsTab(
-                        budgets = uiState.budgets.filter { it.walletId == uiState.selectedWallet?.id },
-                        transactions = uiState.transactions,
-                        symbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN"),
+                        budgets = uiState.budgets,
+                        allWalletTransactions = uiState.allWalletTransactions,
+                        wallets = uiState.wallets,
+                        getCurrencySymbol = viewModel::getCurrencySymbol,
+                        onEdit = { editBudget = it },
                         onDelete = { viewModel.deleteBudget(it) }
                     )
                     1 -> GoalsTab(
                         goals = uiState.savingsGoals,
-                        symbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN"),
+                        getCurrencySymbol = viewModel::getCurrencySymbol,
+                        onEdit = { editGoal = it },
                         onDeposit = { depositGoal = it },
                         onDelete = { viewModel.deleteSavingsGoal(it) }
                     )
                     2 -> FixedTab(
-                        expenses = uiState.fixedExpenses.filter { it.walletId == uiState.selectedWallet?.id },
-                        symbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN"),
+                        expenses = uiState.fixedExpenses,
+                        wallets = uiState.wallets,
+                        getCurrencySymbol = viewModel::getCurrencySymbol,
+                        onEdit = { editFixed = it },
+                        onExecute = { viewModel.executeFixedExpense(it) },
                         onToggle = { id, active -> viewModel.toggleFixedExpense(id, active) },
                         onDelete = { viewModel.deleteFixedExpense(it) }
                     )
@@ -122,39 +128,55 @@ fun BudgetScreen(
     }
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
-    if (showAddBudget) {
-        AddBudgetDialog(
-            categories = uiState.categories.filter { it.type == TransactionType.EXPENSE },
-            walletId = uiState.selectedWallet?.id ?: "",
-            currencyCode = uiState.selectedWallet?.currencyCode ?: "PEN",
-            onAdd = { budget -> viewModel.addBudget(budget); showAddBudget = false },
-            onDismiss = { showAddBudget = false }
+    if (showAddBudget || editBudget != null) {
+        BudgetFormDialog(
+            initial = editBudget,
+            wallets = uiState.wallets,
+            allCategories = uiState.categories.filter { it.type == TransactionType.EXPENSE },
+            getCurrencySymbol = viewModel::getCurrencySymbol,
+            onSave = { budget ->
+                if (editBudget != null) viewModel.updateBudget(budget) else viewModel.addBudget(budget)
+                showAddBudget = false; editBudget = null
+            },
+            onDismiss = { showAddBudget = false; editBudget = null }
         )
     }
 
-    if (showAddGoal) {
-        AddGoalDialog(
-            currencyCode = uiState.selectedWallet?.currencyCode ?: "PEN",
-            onAdd = { goal -> viewModel.addSavingsGoal(goal); showAddGoal = false },
-            onDismiss = { showAddGoal = false }
+    if (showAddGoal || editGoal != null) {
+        GoalFormDialog(
+            initial = editGoal,
+            defaultCurrencyCode = uiState.selectedWallet?.currencyCode ?: "PEN",
+            onSave = { goal ->
+                if (editGoal != null) viewModel.updateSavingsGoal(goal) else viewModel.addSavingsGoal(goal)
+                showAddGoal = false; editGoal = null
+            },
+            onDismiss = { showAddGoal = false; editGoal = null }
         )
     }
 
-    if (showAddFixed) {
-        AddFixedDialog(
-            categories = uiState.categories.filter { it.type == TransactionType.EXPENSE },
-            walletId = uiState.selectedWallet?.id ?: "",
-            currencyCode = uiState.selectedWallet?.currencyCode ?: "PEN",
-            onAdd = { expense -> viewModel.addFixedExpense(expense); showAddFixed = false },
-            onDismiss = { showAddFixed = false }
+    if (showAddFixed || editFixed != null) {
+        FixedFormDialog(
+            initial = editFixed,
+            wallets = uiState.wallets,
+            allCategories = uiState.categories.filter { it.type == TransactionType.EXPENSE },
+            getCurrencySymbol = viewModel::getCurrencySymbol,
+            onSave = { expense ->
+                if (editFixed != null) viewModel.updateFixedExpense(expense) else viewModel.addFixedExpense(expense)
+                showAddFixed = false; editFixed = null
+            },
+            onDismiss = { showAddFixed = false; editFixed = null }
         )
     }
 
     depositGoal?.let { goal ->
         DepositDialog(
             goal = goal,
-            symbol = viewModel.getCurrencySymbol(goal.currencyCode),
-            onDeposit = { amount -> viewModel.addDepositToGoal(goal.id, amount); depositGoal = null },
+            wallets = uiState.wallets,
+            getCurrencySymbol = viewModel::getCurrencySymbol,
+            onDeposit = { walletId, amount ->
+                viewModel.depositToGoalFromWallet(goal.id, walletId, amount)
+                depositGoal = null
+            },
             onDismiss = { depositGoal = null }
         )
     }
@@ -165,8 +187,10 @@ fun BudgetScreen(
 @Composable
 private fun BudgetsTab(
     budgets: List<Budget>,
-    transactions: List<Transaction>,
-    symbol: String,
+    allWalletTransactions: List<Transaction>,
+    wallets: List<Wallet>,
+    getCurrencySymbol: (String) -> String,
+    onEdit: (Budget) -> Unit,
     onDelete: (String) -> Unit
 ) {
     if (budgets.isEmpty()) {
@@ -182,15 +206,31 @@ private fun BudgetsTab(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(budgets, key = { it.id }) { budget ->
-                val spent = calcBudgetSpent(budget, transactions)
-                BudgetCard(budget, spent, symbol, onDelete)
+                val walletTxs = allWalletTransactions.filter { it.walletId == budget.walletId }
+                val spent = calcBudgetSpent(budget, walletTxs)
+                val walletName = wallets.find { it.id == budget.walletId }?.name ?: "Billetera"
+                BudgetCard(
+                    budget = budget,
+                    spent = spent,
+                    walletName = walletName,
+                    symbol = getCurrencySymbol(budget.currencyCode),
+                    onEdit = { onEdit(budget) },
+                    onDelete = { onDelete(budget.id) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun BudgetCard(budget: Budget, spent: Double, symbol: String, onDelete: (String) -> Unit) {
+private fun BudgetCard(
+    budget: Budget,
+    spent: Double,
+    walletName: String,
+    symbol: String,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     val progress = (spent / budget.limitAmount).toFloat().coerceIn(0f, 1f)
     val overBudget = spent > budget.limitAmount
     val progressColor = when {
@@ -219,12 +259,19 @@ private fun BudgetCard(budget: Budget, spent: Double, symbol: String, onDelete: 
                     }
                     Column {
                         Text(budget.categoryName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Text(periodLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "$periodLabel  •  $walletName",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (overBudget) Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                    IconButton(onClick = { onDelete(budget.id) }, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.DeleteOutline, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     }
                 }
@@ -282,7 +329,8 @@ private fun calcBudgetSpent(budget: Budget, transactions: List<Transaction>): Do
 @Composable
 private fun GoalsTab(
     goals: List<SavingsGoal>,
-    symbol: String,
+    getCurrencySymbol: (String) -> String,
+    onEdit: (SavingsGoal) -> Unit,
     onDeposit: (SavingsGoal) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -299,7 +347,13 @@ private fun GoalsTab(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(goals, key = { it.id }) { goal ->
-                GoalCard(goal, symbol, onDeposit, onDelete)
+                GoalCard(
+                    goal = goal,
+                    symbol = getCurrencySymbol(goal.currencyCode),
+                    onEdit = { onEdit(goal) },
+                    onDeposit = onDeposit,
+                    onDelete = onDelete
+                )
             }
         }
     }
@@ -309,6 +363,7 @@ private fun GoalsTab(
 private fun GoalCard(
     goal: SavingsGoal,
     symbol: String,
+    onEdit: () -> Unit,
     onDeposit: (SavingsGoal) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -348,8 +403,13 @@ private fun GoalCard(
                         }
                     }
                 }
-                IconButton(onClick = { onDelete(goal.id) }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.DeleteOutline, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = { onDelete(goal.id) }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.DeleteOutline, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
 
@@ -374,7 +434,11 @@ private fun GoalCard(
                 trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
             )
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     "${(progress * 100).toInt()}% completado",
                     style = MaterialTheme.typography.labelSmall,
@@ -388,8 +452,13 @@ private fun GoalCard(
                     }
                 } else {
                     Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
-                        Text("¡Completada!", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text(
+                            "¡Completada!",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -402,7 +471,10 @@ private fun GoalCard(
 @Composable
 private fun FixedTab(
     expenses: List<FixedExpense>,
-    symbol: String,
+    wallets: List<Wallet>,
+    getCurrencySymbol: (String) -> String,
+    onEdit: (FixedExpense) -> Unit,
+    onExecute: (String) -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -419,7 +491,16 @@ private fun FixedTab(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(expenses, key = { it.id }) { expense ->
-                FixedCard(expense, symbol, onToggle, onDelete)
+                val walletName = wallets.find { it.id == expense.walletId }?.name ?: "Billetera"
+                FixedCard(
+                    expense = expense,
+                    walletName = walletName,
+                    symbol = getCurrencySymbol(expense.currencyCode),
+                    onEdit = { onEdit(expense) },
+                    onExecute = { onExecute(expense.id) },
+                    onToggle = { onToggle(expense.id, it) },
+                    onDelete = { onDelete(expense.id) }
+                )
             }
         }
     }
@@ -428,9 +509,12 @@ private fun FixedTab(
 @Composable
 private fun FixedCard(
     expense: FixedExpense,
+    walletName: String,
     symbol: String,
-    onToggle: (String, Boolean) -> Unit,
-    onDelete: (String) -> Unit
+    onEdit: () -> Unit,
+    onExecute: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+    onDelete: () -> Unit
 ) {
     val color = if (expense.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f)
 
@@ -440,9 +524,11 @@ private fun FixedCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
     ) {
         Row(
-            modifier = Modifier.padding(14.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(14.dp)
+                .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Surface(shape = CircleShape, color = color.copy(alpha = 0.15f), modifier = Modifier.size(40.dp)) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -452,7 +538,7 @@ private fun FixedCard(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(expense.description, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "${expense.categoryName}  •  día ${expense.dayOfMonth} de cada mes",
+                    "${expense.categoryName}  •  día ${expense.dayOfMonth}  •  $walletName",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -463,12 +549,18 @@ private fun FixedCard(
                     color = color
                 )
             }
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            }
+            IconButton(onClick = onExecute, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+            }
             Switch(
                 checked = expense.isActive,
-                onCheckedChange = { onToggle(expense.id, it) },
+                onCheckedChange = onToggle,
                 modifier = Modifier.size(width = 44.dp, height = 24.dp)
             )
-            IconButton(onClick = { onDelete(expense.id) }, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.DeleteOutline, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
@@ -481,39 +573,74 @@ private fun FixedCard(
 private fun PlanningEmptyState(icon: ImageVector, message: String, subtitle: String) {
     Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f), modifier = Modifier.size(72.dp)) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                modifier = Modifier.size(72.dp)
+            ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
                 }
             }
             Text(message, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }
 
-// ── Dialog: Agregar Presupuesto ────────────────────────────────────────────────
+// ── Dialog: Presupuesto (Agregar / Editar) ─────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddBudgetDialog(
-    categories: List<Category>,
-    walletId: String,
-    currencyCode: String,
-    onAdd: (Budget) -> Unit,
+private fun BudgetFormDialog(
+    initial: Budget?,
+    wallets: List<Wallet>,
+    allCategories: List<Category>,
+    getCurrencySymbol: (String) -> String,
+    onSave: (Budget) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf(categories.firstOrNull()?.name ?: "") }
-    var amountText by remember { mutableStateOf("") }
-    var period by remember { mutableStateOf("MONTHLY") }
+    val defaultWallet = if (initial != null) wallets.find { it.id == initial.walletId } ?: wallets.firstOrNull() else wallets.firstOrNull()
+    var selectedWallet by remember { mutableStateOf(defaultWallet) }
+    var selectedCategory by remember { mutableStateOf(initial?.categoryName ?: (allCategories.firstOrNull()?.name ?: "")) }
+    var amountText by remember { mutableStateOf(if (initial != null) String.format("%.2f", initial.limitAmount) else "") }
+    var period by remember { mutableStateOf(initial?.period ?: "MONTHLY") }
+    var showWalletMenu by remember { mutableStateOf(false) }
     var showCatMenu by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.PieChart, null, tint = MaterialTheme.colorScheme.primary) },
-        title = { Text("Nuevo Presupuesto", fontWeight = FontWeight.Bold) },
+        title = { Text(if (initial != null) "Editar Presupuesto" else "Nuevo Presupuesto", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box {
+                    OutlinedTextField(
+                        value = selectedWallet?.name ?: "Seleccionar billetera",
+                        onValueChange = {},
+                        label = { Text("Billetera") },
+                        readOnly = true,
+                        leadingIcon = { Icon(Icons.Default.AccountBalanceWallet, null, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Surface(onClick = { showWalletMenu = true }, modifier = Modifier.matchParentSize(), color = Color.Transparent) {}
+                    DropdownMenu(expanded = showWalletMenu, onDismissRequest = { showWalletMenu = false }) {
+                        wallets.forEach { wallet ->
+                            DropdownMenuItem(
+                                text = { Text("${wallet.name} (${getCurrencySymbol(wallet.currencyCode)})") },
+                                onClick = { selectedWallet = wallet; showWalletMenu = false }
+                            )
+                        }
+                    }
+                }
+
                 Box {
                     OutlinedTextField(
                         value = selectedCategory,
@@ -524,13 +651,9 @@ private fun AddBudgetDialog(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    Surface(
-                        onClick = { showCatMenu = true },
-                        modifier = Modifier.matchParentSize(),
-                        color = Color.Transparent
-                    ) {}
+                    Surface(onClick = { showCatMenu = true }, modifier = Modifier.matchParentSize(), color = Color.Transparent) {}
                     DropdownMenu(expanded = showCatMenu, onDismissRequest = { showCatMenu = false }) {
-                        categories.forEach { cat ->
+                        allCategories.forEach { cat ->
                             DropdownMenuItem(
                                 text = { Text(cat.name) },
                                 onClick = { selectedCategory = cat.name; showCatMenu = false }
@@ -542,7 +665,7 @@ private fun AddBudgetDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Límite de gasto") },
+                    label = { Text("Límite de gasto (${getCurrencySymbol(selectedWallet?.currencyCode ?: "PEN")})") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -550,16 +673,7 @@ private fun AddBudgetDialog(
 
                 Text("Período", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = period == "MONTHLY",
-                        onClick = { period = "MONTHLY" },
-                        label = { Text("Mensual") }
-                    )
-                    FilterChip(
-                        selected = period == "WEEKLY",
-                        onClick = { period = "WEEKLY" },
-                        label = { Text("Semanal") }
-                    )
+                    FilterChip(selected = period == "MONTHLY", onClick = { period = "MONTHLY" }, label = { Text("Mensual") })
                 }
             }
         },
@@ -567,36 +681,48 @@ private fun AddBudgetDialog(
             Button(
                 onClick = {
                     val amount = amountText.toDoubleOrNull() ?: return@Button
+                    val wId = selectedWallet?.id ?: return@Button
+                    val curr = selectedWallet?.currencyCode ?: "PEN"
                     if (selectedCategory.isBlank() || amount <= 0) return@Button
-                    onAdd(Budget(walletId = walletId, categoryName = selectedCategory, limitAmount = amount, period = period, currencyCode = currencyCode))
+                    onSave(Budget(
+                        id = initial?.id ?: UUID.randomUUID().toString(),
+                        walletId = wId,
+                        categoryName = selectedCategory,
+                        limitAmount = amount,
+                        period = period,
+                        currencyCode = curr
+                    ))
                 },
                 shape = RoundedCornerShape(12.dp)
-            ) { Text("Crear") }
+            ) { Text(if (initial != null) "Guardar" else "Crear") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
 }
 
-// ── Dialog: Agregar Meta ───────────────────────────────────────────────────────
+// ── Dialog: Meta de Ahorro (Agregar / Editar) ─────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddGoalDialog(
-    currencyCode: String,
-    onAdd: (SavingsGoal) -> Unit,
+private fun GoalFormDialog(
+    initial: SavingsGoal?,
+    defaultCurrencyCode: String,
+    onSave: (SavingsGoal) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var targetText by remember { mutableStateOf("") }
-    var initialText by remember { mutableStateOf("0") }
-    var hasDeadline by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var targetText by remember { mutableStateOf(if (initial != null) String.format("%.2f", initial.targetAmount) else "") }
+    var initialAmtText by remember { mutableStateOf("0") }
+    var hasDeadline by remember { mutableStateOf(initial != null && initial.deadline > 0) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var deadlineMs by remember { mutableStateOf(0L) }
-    val datePickerState = rememberDatePickerState()
+    var deadlineMs by remember { mutableStateOf(initial?.deadline ?: 0L) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = if (initial != null && initial.deadline > 0) initial.deadline else null
+    )
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     val goalColors = listOf("#4338CA", "#065F46", "#7F1D1D", "#C2410C", "#6B21A8", "#0369A1")
-    var selectedColor by remember { mutableStateOf(goalColors.first()) }
+    var selectedColor by remember { mutableStateOf(initial?.color ?: goalColors.first()) }
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -620,7 +746,7 @@ private fun AddGoalDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Flag, null, tint = MaterialTheme.colorScheme.primary) },
-        title = { Text("Nueva Meta de Ahorro", fontWeight = FontWeight.Bold) },
+        title = { Text(if (initial != null) "Editar Meta" else "Nueva Meta de Ahorro", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OutlinedTextField(
@@ -638,16 +764,22 @@ private fun AddGoalDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
-                OutlinedTextField(
-                    value = initialText,
-                    onValueChange = { initialText = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Ahorro inicial (opcional)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                if (initial == null) {
+                    OutlinedTextField(
+                        value = initialAmtText,
+                        onValueChange = { initialAmtText = it.filter { c -> c.isDigit() || c == '.' } },
+                        label = { Text("Ahorro inicial (opcional)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text("Fecha límite", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Switch(checked = hasDeadline, onCheckedChange = { hasDeadline = it; if (it) showDatePicker = true })
                 }
@@ -678,19 +810,21 @@ private fun AddGoalDialog(
             Button(
                 onClick = {
                     val target = targetText.toDoubleOrNull() ?: return@Button
-                    val initial = initialText.toDoubleOrNull() ?: 0.0
                     if (name.isBlank() || target <= 0) return@Button
-                    onAdd(SavingsGoal(
+                    val currentAmt = if (initial != null) initial.currentAmount
+                                     else (initialAmtText.toDoubleOrNull() ?: 0.0).coerceAtMost(target)
+                    onSave(SavingsGoal(
+                        id = initial?.id ?: UUID.randomUUID().toString(),
                         name = name.trim(),
                         targetAmount = target,
-                        currentAmount = initial.coerceAtMost(target),
+                        currentAmount = currentAmt,
                         deadline = if (hasDeadline) deadlineMs else 0L,
-                        currencyCode = currencyCode,
+                        currencyCode = initial?.currencyCode ?: defaultCurrencyCode,
                         color = selectedColor
                     ))
                 },
                 shape = RoundedCornerShape(12.dp)
-            ) { Text("Crear") }
+            ) { Text(if (initial != null) "Guardar" else "Crear") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
@@ -701,11 +835,18 @@ private fun AddGoalDialog(
 @Composable
 private fun DepositDialog(
     goal: SavingsGoal,
-    symbol: String,
-    onDeposit: (Double) -> Unit,
+    wallets: List<Wallet>,
+    getCurrencySymbol: (String) -> String,
+    onDeposit: (walletId: String, amount: Double) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var selectedWallet by remember { mutableStateOf(wallets.firstOrNull()) }
     var amountText by remember { mutableStateOf("") }
+    var showWalletMenu by remember { mutableStateOf(false) }
+
+    val walletSym = getCurrencySymbol(selectedWallet?.currencyCode ?: "PEN")
+    val goalSym = getCurrencySymbol(goal.currencyCode)
+    val isDifferent = selectedWallet?.currencyCode != null && selectedWallet?.currencyCode != goal.currencyCode
     val remaining = goal.targetAmount - goal.currentAmount
 
     AlertDialog(
@@ -715,26 +856,60 @@ private fun DepositDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "Falta $symbol ${String.format("%.2f", remaining)} para completar la meta",
+                    "Falta $goalSym ${String.format("%.2f", remaining)} para completar la meta",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                Box {
+                    OutlinedTextField(
+                        value = selectedWallet?.name ?: "Seleccionar billetera",
+                        onValueChange = {},
+                        label = { Text("Desde billetera") },
+                        readOnly = true,
+                        leadingIcon = { Icon(Icons.Default.AccountBalanceWallet, null, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Surface(onClick = { showWalletMenu = true }, modifier = Modifier.matchParentSize(), color = Color.Transparent) {}
+                    DropdownMenu(expanded = showWalletMenu, onDismissRequest = { showWalletMenu = false }) {
+                        wallets.forEach { wallet ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text("${wallet.name} — ${getCurrencySymbol(wallet.currencyCode)}${String.format("%.2f", wallet.balance)}")
+                                },
+                                onClick = { selectedWallet = wallet; showWalletMenu = false }
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Monto a depositar") },
+                    label = { Text("Monto a depositar ($walletSym)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+
+                if (isDifferent) {
+                    Text(
+                        "Se convertirá automáticamente de ${selectedWallet?.currencyCode} a ${goal.currencyCode}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
                     val amount = amountText.toDoubleOrNull() ?: return@Button
+                    val wId = selectedWallet?.id ?: return@Button
                     if (amount <= 0) return@Button
-                    onDeposit(amount)
+                    onDeposit(wId, amount)
                 },
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Depositar") }
@@ -743,28 +918,54 @@ private fun DepositDialog(
     )
 }
 
-// ── Dialog: Agregar Gasto Fijo ─────────────────────────────────────────────────
+// ── Dialog: Gasto Fijo (Agregar / Editar) ─────────────────────────────────────
 
 @Composable
-private fun AddFixedDialog(
-    categories: List<Category>,
-    walletId: String,
-    currencyCode: String,
-    onAdd: (FixedExpense) -> Unit,
+private fun FixedFormDialog(
+    initial: FixedExpense?,
+    wallets: List<Wallet>,
+    allCategories: List<Category>,
+    getCurrencySymbol: (String) -> String,
+    onSave: (FixedExpense) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var description by remember { mutableStateOf("") }
-    var amountText by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(categories.firstOrNull()?.name ?: "") }
-    var dayText by remember { mutableStateOf("1") }
+    val defaultWallet = if (initial != null) wallets.find { it.id == initial.walletId } ?: wallets.firstOrNull() else wallets.firstOrNull()
+    var selectedWallet by remember { mutableStateOf(defaultWallet) }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var amountText by remember { mutableStateOf(if (initial != null) String.format("%.2f", initial.amount) else "") }
+    var selectedCategory by remember { mutableStateOf(initial?.categoryName ?: (allCategories.firstOrNull()?.name ?: "")) }
+    var dayText by remember { mutableStateOf(initial?.dayOfMonth?.toString() ?: "1") }
+    var showWalletMenu by remember { mutableStateOf(false) }
     var showCatMenu by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Repeat, null, tint = MaterialTheme.colorScheme.primary) },
-        title = { Text("Nuevo Gasto Fijo", fontWeight = FontWeight.Bold) },
+        title = { Text(if (initial != null) "Editar Gasto Fijo" else "Nuevo Gasto Fijo", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box {
+                    OutlinedTextField(
+                        value = selectedWallet?.name ?: "Seleccionar billetera",
+                        onValueChange = {},
+                        label = { Text("Billetera") },
+                        readOnly = true,
+                        leadingIcon = { Icon(Icons.Default.AccountBalanceWallet, null, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Surface(onClick = { showWalletMenu = true }, modifier = Modifier.matchParentSize(), color = Color.Transparent) {}
+                    DropdownMenu(expanded = showWalletMenu, onDismissRequest = { showWalletMenu = false }) {
+                        wallets.forEach { wallet ->
+                            DropdownMenuItem(
+                                text = { Text("${wallet.name} (${getCurrencySymbol(wallet.currencyCode)})") },
+                                onClick = { selectedWallet = wallet; showWalletMenu = false }
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
@@ -772,10 +973,11 @@ private fun AddFixedDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Monto mensual") },
+                    label = { Text("Monto mensual (${getCurrencySymbol(selectedWallet?.currencyCode ?: "PEN")})") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -791,13 +993,9 @@ private fun AddFixedDialog(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    Surface(
-                        onClick = { showCatMenu = true },
-                        modifier = Modifier.matchParentSize(),
-                        color = Color.Transparent
-                    ) {}
+                    Surface(onClick = { showCatMenu = true }, modifier = Modifier.matchParentSize(), color = Color.Transparent) {}
                     DropdownMenu(expanded = showCatMenu, onDismissRequest = { showCatMenu = false }) {
-                        categories.forEach { cat ->
+                        allCategories.forEach { cat ->
                             DropdownMenuItem(
                                 text = { Text(cat.name) },
                                 onClick = { selectedCategory = cat.name; showCatMenu = false }
@@ -824,19 +1022,22 @@ private fun AddFixedDialog(
                 onClick = {
                     val amount = amountText.toDoubleOrNull() ?: return@Button
                     val day = dayText.toIntOrNull()?.coerceIn(1, 28) ?: 1
+                    val wId = selectedWallet?.id ?: return@Button
+                    val curr = selectedWallet?.currencyCode ?: "PEN"
                     if (description.isBlank() || amount <= 0) return@Button
-                    onAdd(FixedExpense(
+                    onSave(FixedExpense(
+                        id = initial?.id ?: UUID.randomUUID().toString(),
                         description = description.trim(),
                         amount = amount,
                         categoryName = selectedCategory,
-                        walletId = walletId,
+                        walletId = wId,
                         dayOfMonth = day,
-                        currencyCode = currencyCode,
-                        isActive = true
+                        currencyCode = curr,
+                        isActive = initial?.isActive ?: true
                     ))
                 },
                 shape = RoundedCornerShape(12.dp)
-            ) { Text("Crear") }
+            ) { Text(if (initial != null) "Guardar" else "Crear") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )

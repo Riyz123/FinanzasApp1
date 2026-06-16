@@ -28,12 +28,19 @@ import retrofit2.converter.gson.GsonConverterFactory
 import android.content.Context
 import com.upn3.proyecto_finanzas_personales.network.CloudinaryClient
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import android.util.Log
+
+data class UserSearchResult(
+    val email: String = "",
+    val displayName: String = ""
+)
 
 data class FinanceState(
     val balance: Double = 0.0,
@@ -61,7 +68,10 @@ data class FinanceState(
     val budgets: List<com.upn3.proyecto_finanzas_personales.model.Budget> = emptyList(),
     val savingsGoals: List<com.upn3.proyecto_finanzas_personales.model.SavingsGoal> = emptyList(),
     val fixedExpenses: List<com.upn3.proyecto_finanzas_personales.model.FixedExpense> = emptyList(),
-    val isLoadingBudgets: Boolean = false
+    val isLoadingBudgets: Boolean = false,
+    val allWalletTransactions: List<Transaction> = emptyList(),
+    val userSearchResults: List<UserSearchResult> = emptyList(),
+    val isSearchingUsers: Boolean = false
 )
 
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
@@ -77,6 +87,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     
     private val currencyService = retrofit.create(CurrencyService::class.java)
     private val gson = Gson()
+    private var searchJob: Job? = null
 
     private val _uiState = MutableStateFlow(FinanceState())
     val uiState: StateFlow<FinanceState> = _uiState.asStateFlow()
@@ -795,6 +806,18 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 val wallets = snapshot.toObjects(Wallet::class.java)
                 allWallets.clear()
                 allWallets.addAll(wallets)
+                // Migrate wallets missing accountId
+                val missingId = wallets.filter { it.accountId.isBlank() }
+                if (missingId.isNotEmpty()) {
+                    val batch = db.batch()
+                    missingId.forEach { w ->
+                        val newId = com.upn3.proyecto_finanzas_personales.model.generateAccountId()
+                        val idx = allWallets.indexOfFirst { it.id == w.id }
+                        if (idx != -1) allWallets[idx] = allWallets[idx].copy(accountId = newId)
+                        batch.update(db.collection("users").document(email).collection("wallets").document(w.id), "accountId", newId)
+                    }
+                    try { batch.commit().await() } catch (_: Exception) {}
+                }
                 if (allWallets.isEmpty()) {
                     createWallet(Wallet(id = "default", name = "Billetera Principal", currencyCode = "PEN", balance = 0.0))
                 } else {
@@ -1367,6 +1390,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 val fixed = db.collection("users").document(email).collection("fixed_expenses")
                     .get().await().documents.mapNotNull { it.toObject(com.upn3.proyecto_finanzas_personales.model.FixedExpense::class.java) }
                 _uiState.update { it.copy(budgets = budgets, savingsGoals = goals, fixedExpenses = fixed, isLoadingBudgets = false) }
+                checkAndExecuteFixedExpenses(fixed)
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoadingBudgets = false) }
             }
@@ -1471,6 +1495,297 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun searchUsers(query: String) {
+        searchJob?.cancel()
+        if (query.length < 2) {
+            _uiState.update { it.copy(userSearchResults = emptyList(), isSearchingUsers = false) }
+            return
+        }
+        val currentEmail = uiState.value.currentUser?.email ?: return
+        searchJob = viewModelScope.launch {
+            delay(300)
+            _uiState.update { it.copy(isSearchingUsers = true) }
+            try {
+                val q = query.lowercase().trim()
+                val snapshot = db.collection("users").get().await()
+                val results = snapshot.documents.mapNotNull { doc ->
+                    val docEmail = doc.id
+                    if (docEmail == currentEmail) return@mapNotNull null
+                    val name = "${doc.getString("name") ?: ""} ${doc.getString("lastname") ?: ""}".trim()
+                    val displayName = name.ifBlank { docEmail }
+                    if (docEmail.lowercase().contains(q) || name.lowercase().contains(q)) {
+                        UserSearchResult(email = docEmail, displayName = displayName)
+                    } else null
+                }
+                _uiState.update { it.copy(userSearchResults = results, isSearchingUsers = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSearchingUsers = false, userSearchResults = emptyList()) }
+            }
+        }
+    }
+
+    fun clearUserSearch() {
+        searchJob?.cancel()
+        _uiState.update { it.copy(userSearchResults = emptyList(), isSearchingUsers = false) }
+    }
+
+    fun getUserWallets(email: String, onResult: (List<Wallet>) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val snap = db.collection("users").document(email).collection("wallets").get().await()
+                onResult(snap.toObjects(Wallet::class.java))
+            } catch (e: Exception) {
+                onResult(emptyList())
+            }
+        }
+    }
+
+    fun transferToUser(
+        fromWallet: Wallet,
+        toEmail: String,
+        toWallet: Wallet,
+        amount: Double,
+        description: String,
+        onSuccess: () -> Unit = {}
+    ) {
+        val email = uiState.value.currentUser?.email ?: return
+        if (amount > fromWallet.balance) {
+            _uiState.update { it.copy(errorMessage = "Saldo insuficiente en ${fromWallet.name}.") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+                var conversionRate = 1.0
+                if (fromWallet.currencyCode != toWallet.currencyCode) {
+                    var rates: Map<String, Double> = emptyMap()
+                    try {
+                        rates = withTimeout(5000) { currencyService.getCurrencyRate(toWallet.currencyCode).rates } ?: emptyMap()
+                    } catch (e: Exception) {
+                        val cachedJson = userPreferences.cachedRates.first()
+                        if (cachedJson != null) rates = gson.fromJson(cachedJson, object : com.google.gson.reflect.TypeToken<Map<String, Double>>() {}.type)
+                    }
+                    val rv = rates[fromWallet.currencyCode]
+                    conversionRate = if (rv != null && rv != 0.0) 1.0 / rv.toDouble() else 1.0
+                }
+                val convertedAmount = amount * conversionRate
+                val motivo = description.trim()
+                val senderDesc = "Transferencia a $toEmail${if (motivo.isNotBlank()) " — $motivo" else ""}"
+                val receiverDesc = "Transferencia de $email${if (motivo.isNotBlank()) " — $motivo" else ""}"
+                val expenseTrans = Transaction(
+                    amount = amount, currencyCode = fromWallet.currencyCode,
+                    description = senderDesc, origin = "Transferencia",
+                    type = TransactionType.TRANSFER, walletId = fromWallet.id,
+                    transferContact = TransferContact(recipientName = toEmail, recipientAlias = toWallet.accountId, bank = "", motivo = motivo)
+                )
+                val incomeTrans = Transaction(
+                    amount = convertedAmount, currencyCode = toWallet.currencyCode,
+                    description = receiverDesc, origin = "Transferencia",
+                    type = TransactionType.TRANSFER, walletId = toWallet.id
+                )
+                val newFromBalance = fromWallet.balance - amount
+                val newToBalance = toWallet.balance + convertedAmount
+                val traceFields = mapOf(
+                    "fromUser" to mapOf("value" to email),
+                    "toUser" to mapOf("value" to toEmail),
+                    "fromWallet" to mapOf("value" to "${fromWallet.name} (#${fromWallet.accountId})"),
+                    "toWallet" to mapOf("value" to "${toWallet.name} (#${toWallet.accountId})"),
+                    "originalAmount" to mapOf("value" to "$amount ${fromWallet.currencyCode}"),
+                    "convertedAmount" to mapOf("value" to "$convertedAmount ${toWallet.currencyCode}"),
+                    "conversionRate" to mapOf("value" to conversionRate.toString()),
+                    "description" to mapOf("value" to motivo)
+                )
+                db.runBatch { batch ->
+                    val senderRef = db.collection("users").document(email)
+                    val receiverRef = db.collection("users").document(toEmail)
+                    batch.set(senderRef.collection("transactions").document(expenseTrans.id), expenseTrans)
+                    batch.update(senderRef.collection("wallets").document(fromWallet.id), "balance", newFromBalance)
+                    batch.set(receiverRef.collection("transactions").document(incomeTrans.id), incomeTrans)
+                    batch.update(receiverRef.collection("wallets").document(toWallet.id), "balance", newToBalance)
+                }.await()
+                allTransactions.add(0, expenseTrans)
+                val fIdx = allWallets.indexOfFirst { it.id == fromWallet.id }
+                if (fIdx != -1) allWallets[fIdx] = allWallets[fIdx].copy(balance = newFromBalance)
+                updateState()
+                // Trazabilidad emisor
+                addAuditLog(email, expenseTrans.id, AuditLog(transactionId = expenseTrans.id, action = AuditAction.TRANSFERENCIA, userEmail = email, changedFields = traceFields))
+                // Trazabilidad receptor (escribe directamente en su colección)
+                val receiverLog = AuditLog(transactionId = incomeTrans.id, action = AuditAction.TRANSFERENCIA, userEmail = toEmail, changedFields = traceFields)
+                try {
+                    db.collection("users").document(toEmail)
+                        .collection("transactions").document(incomeTrans.id)
+                        .collection("audit_logs").document(receiverLog.id)
+                        .set(receiverLog).await()
+                } catch (_: Exception) {}
+                _uiState.update { it.copy(isLoading = false) }
+                onSuccess()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error en transferencia: ${e.message}", isLoading = false) }
+            }
+        }
+    }
+
+    fun updateBudget(budget: com.upn3.proyecto_finanzas_personales.model.Budget) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("budgets").document(budget.id).set(budget).await()
+                _uiState.update { s -> s.copy(budgets = s.budgets.map { if (it.id == budget.id) budget else it }) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al actualizar presupuesto") }
+            }
+        }
+    }
+
+    fun updateSavingsGoal(goal: com.upn3.proyecto_finanzas_personales.model.SavingsGoal) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("savings_goals").document(goal.id).set(goal).await()
+                _uiState.update { s -> s.copy(savingsGoals = s.savingsGoals.map { if (it.id == goal.id) goal else it }) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al actualizar meta") }
+            }
+        }
+    }
+
+    fun updateFixedExpense(expense: com.upn3.proyecto_finanzas_personales.model.FixedExpense) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("fixed_expenses").document(expense.id).set(expense).await()
+                _uiState.update { s -> s.copy(fixedExpenses = s.fixedExpenses.map { if (it.id == expense.id) expense else it }) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al actualizar gasto fijo") }
+            }
+        }
+    }
+
+    fun depositToGoalFromWallet(
+        goalId: String,
+        fromWalletId: String,
+        amountInWalletCurrency: Double,
+        onSuccess: () -> Unit = {}
+    ) {
+        val email = uiState.value.currentUser?.email ?: return
+        val goal = _uiState.value.savingsGoals.find { it.id == goalId } ?: return
+        val fromWallet = allWallets.find { it.id == fromWalletId } ?: return
+        if (amountInWalletCurrency > fromWallet.balance) {
+            _uiState.update { it.copy(errorMessage = "Saldo insuficiente en ${fromWallet.name}") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+                var amountInGoalCurrency = amountInWalletCurrency
+                if (fromWallet.currencyCode != goal.currencyCode) {
+                    var rates: Map<String, Double> = emptyMap()
+                    try {
+                        rates = withTimeout(5000) { currencyService.getCurrencyRate(goal.currencyCode).rates } ?: emptyMap()
+                    } catch (_: Exception) {
+                        val cachedJson = userPreferences.cachedRates.first()
+                        if (cachedJson != null) rates = gson.fromJson(cachedJson, object : com.google.gson.reflect.TypeToken<Map<String, Double>>() {}.type)
+                    }
+                    val rate = rates[fromWallet.currencyCode]
+                    if (rate != null && rate != 0.0) amountInGoalCurrency = amountInWalletCurrency / rate
+                }
+                val symFrom = getCurrencySymbol(fromWallet.currencyCode)
+                val symGoal = getCurrencySymbol(goal.currencyCode)
+                val desc = if (fromWallet.currencyCode != goal.currencyCode)
+                    "Depósito meta \"${goal.name}\" ($symFrom${String.format("%.2f", amountInWalletCurrency)} → $symGoal${String.format("%.2f", amountInGoalCurrency)})"
+                else
+                    "Depósito en meta \"${goal.name}\""
+                val tx = Transaction(
+                    amount = amountInWalletCurrency, currencyCode = fromWallet.currencyCode,
+                    description = desc, origin = "Meta de Ahorro",
+                    type = TransactionType.EXPENSE, walletId = fromWallet.id
+                )
+                val newGoal = goal.copy(currentAmount = (goal.currentAmount + amountInGoalCurrency).coerceAtMost(goal.targetAmount))
+                val newBalance = fromWallet.balance - amountInWalletCurrency
+                db.runBatch { batch ->
+                    val ref = db.collection("users").document(email)
+                    batch.set(ref.collection("transactions").document(tx.id), tx)
+                    batch.update(ref.collection("wallets").document(fromWallet.id), "balance", newBalance)
+                    batch.set(ref.collection("savings_goals").document(goalId), newGoal)
+                }.await()
+                allTransactions.add(0, tx)
+                val wIdx = allWallets.indexOfFirst { it.id == fromWallet.id }
+                if (wIdx != -1) allWallets[wIdx] = allWallets[wIdx].copy(balance = newBalance)
+                _uiState.update { s -> s.copy(savingsGoals = s.savingsGoals.map { if (it.id == goalId) newGoal else it }) }
+                updateState()
+                addAuditLog(email, tx.id, AuditLog(transactionId = tx.id, action = AuditAction.CREACION, userEmail = email))
+                _uiState.update { it.copy(isLoading = false) }
+                onSuccess()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al depositar: ${e.message}", isLoading = false) }
+            }
+        }
+    }
+
+    fun executeFixedExpense(expenseId: String, onSuccess: () -> Unit = {}) {
+        val email = uiState.value.currentUser?.email ?: return
+        val expense = _uiState.value.fixedExpenses.find { it.id == expenseId } ?: return
+        val wallet = allWallets.find { it.id == expense.walletId } ?: return
+        viewModelScope.launch {
+            try {
+                var deduction = expense.amount
+                if (expense.currencyCode != wallet.currencyCode) {
+                    var rates: Map<String, Double> = emptyMap()
+                    try {
+                        rates = withTimeout(5000) { currencyService.getCurrencyRate(wallet.currencyCode).rates } ?: emptyMap()
+                    } catch (_: Exception) {
+                        val cachedJson = userPreferences.cachedRates.first()
+                        if (cachedJson != null) rates = gson.fromJson(cachedJson, object : com.google.gson.reflect.TypeToken<Map<String, Double>>() {}.type)
+                    }
+                    val rate = rates[expense.currencyCode]
+                    if (rate != null && rate != 0.0) deduction = expense.amount / rate
+                }
+                if (deduction > wallet.balance) {
+                    _uiState.update { it.copy(errorMessage = "Saldo insuficiente para \"${expense.description}\"") }
+                    return@launch
+                }
+                val symE = getCurrencySymbol(expense.currencyCode)
+                val symW = getCurrencySymbol(wallet.currencyCode)
+                val desc = if (expense.currencyCode != wallet.currencyCode)
+                    "${expense.description} ($symE${String.format("%.2f", expense.amount)} → $symW${String.format("%.2f", deduction)})"
+                else expense.description
+                val tx = Transaction(
+                    amount = deduction, currencyCode = wallet.currencyCode,
+                    description = desc, origin = expense.categoryName,
+                    type = TransactionType.EXPENSE, walletId = wallet.id
+                )
+                val newBalance = wallet.balance - deduction
+                db.runBatch { batch ->
+                    val ref = db.collection("users").document(email)
+                    batch.set(ref.collection("transactions").document(tx.id), tx)
+                    batch.update(ref.collection("wallets").document(wallet.id), "balance", newBalance)
+                }.await()
+                allTransactions.add(0, tx)
+                val wIdx = allWallets.indexOfFirst { it.id == wallet.id }
+                if (wIdx != -1) allWallets[wIdx] = allWallets[wIdx].copy(balance = newBalance)
+                updateState()
+                addAuditLog(email, tx.id, AuditLog(transactionId = tx.id, action = AuditAction.CREACION, userEmail = email))
+                onSuccess()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al ejecutar gasto fijo: ${e.message}") }
+            }
+        }
+    }
+
+    private fun checkAndExecuteFixedExpenses(fixedExpenses: List<com.upn3.proyecto_finanzas_personales.model.FixedExpense>) {
+        val today = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
+        val thisMonth = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
+        fixedExpenses.filter { it.isActive && it.dayOfMonth == today }.forEach { expense ->
+            val alreadyExecuted = allTransactions.any { tx ->
+                tx.walletId == expense.walletId &&
+                tx.origin == expense.categoryName &&
+                tx.description.startsWith(expense.description) &&
+                java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date(tx.timestamp)) == thisMonth
+            }
+            if (!alreadyExecuted) executeFixedExpense(expense.id)
+        }
+    }
+
     private fun updateState() {
         val currentId = _uiState.value.selectedWallet?.id
         val updatedWallet = allWallets.find { it.id == currentId }
@@ -1479,6 +1794,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         val filtered = if (updatedWallet != null) allTransactions.filter { it.walletId == updatedWallet.id } else allTransactions
         _uiState.update { it.copy(
             transactions = filtered.sortedByDescending { t -> t.timestamp },
+            allWalletTransactions = allTransactions.toList(),
             categories = allCategories.toList(),
             wallets = allWallets.toList(),
             selectedWallet = updatedWallet,

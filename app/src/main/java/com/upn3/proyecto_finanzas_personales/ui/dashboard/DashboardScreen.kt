@@ -40,6 +40,10 @@ import com.upn3.proyecto_finanzas_personales.ui.components.NumericKeyboard
 import com.upn3.proyecto_finanzas_personales.ui.components.TransactionDetailDialog
 import com.upn3.proyecto_finanzas_personales.ui.theme.AppTheme
 import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
+import com.upn3.proyecto_finanzas_personales.viewmodel.UserSearchResult
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import android.widget.Toast
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
@@ -109,6 +113,12 @@ fun DashboardScreen(
     var extMotivo by remember { mutableStateOf("") }
     var extTransferDate by remember { mutableStateOf(Calendar.getInstance()) }
     var showExtDatePicker by remember { mutableStateOf(false) }
+    var userSearchQuery by remember { mutableStateOf("") }
+    var selectedRecipientUser by remember { mutableStateOf<UserSearchResult?>(null) }
+    var selectedUserWallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
+    var selectedUserWallet by remember { mutableStateOf<Wallet?>(null) }
+    var isLoadingUserWallets by remember { mutableStateOf(false) }
+    var extFromWallet by remember { mutableStateOf<Wallet?>(null) }
     var showAddWalletDialog by remember { mutableStateOf(false) }
     var showEditWalletDialog by remember { mutableStateOf(false) }
     var editingWallet by remember { mutableStateOf<com.upn3.proyecto_finanzas_personales.model.Wallet?>(null) }
@@ -810,9 +820,11 @@ fun DashboardScreen(
     if (showTransferDialog) {
         val fromWallet = uiState.selectedWallet
 
-        LaunchedEffect(selectedToWallet?.id, transferMode) {
-            if (transferMode == 0 && fromWallet != null && selectedToWallet != null) {
-                viewModel.fetchExchangeRatePreview(fromWallet.currencyCode, selectedToWallet!!.currencyCode)
+        LaunchedEffect(selectedToWallet?.id, selectedUserWallet?.id, extFromWallet?.id, transferMode) {
+            val currentFrom = if (transferMode == 1) (extFromWallet ?: fromWallet) else fromWallet
+            val toW = if (transferMode == 0) selectedToWallet else selectedUserWallet
+            if (currentFrom != null && toW != null) {
+                viewModel.fetchExchangeRatePreview(currentFrom.currencyCode, toW.currencyCode)
             }
         }
 
@@ -826,6 +838,13 @@ fun DashboardScreen(
             extBank = ""
             extMotivo = ""
             extTransferDate = Calendar.getInstance()
+            userSearchQuery = ""
+            selectedRecipientUser = null
+            selectedUserWallets = emptyList()
+            selectedUserWallet = null
+            isLoadingUserWallets = false
+            extFromWallet = null
+            viewModel.clearUserSearch()
             viewModel.clearError()
         }
 
@@ -974,83 +993,215 @@ fun DashboardScreen(
                                 }
                             } else {
                                 // ── A otra persona ───────────────────────────────
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.AccountBalanceWallet, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                        Text("Desde: ${fromWallet?.name} (${fromWallet?.currencyCode})", style = MaterialTheme.typography.bodyMedium)
+                                // Billetera origen
+                                Text("Desde:", style = MaterialTheme.typography.labelLarge)
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(uiState.wallets, key = { it.id }) { wallet ->
+                                        val isSel = (extFromWallet ?: fromWallet)?.id == wallet.id
+                                        val flag = currencies.find { c -> c.first == wallet.currencyCode }?.second?.take(2) ?: "💰"
+                                        FilterChip(
+                                            selected = isSel,
+                                            onClick = {
+                                                extFromWallet = wallet
+                                                if (selectedUserWallet != null) viewModel.fetchExchangeRatePreview(wallet.currencyCode, selectedUserWallet!!.currencyCode)
+                                            },
+                                            label = { Text("$flag ${wallet.name} (${wallet.currencyCode})") }
+                                        )
                                     }
                                 }
+
+                                // Buscador de usuario
                                 OutlinedTextField(
-                                    value = extRecipientName,
-                                    onValueChange = { extRecipientName = it; viewModel.clearError() },
-                                    label = { Text("Nombre del destinatario *") },
-                                    leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp)) },
+                                    value = userSearchQuery,
+                                    onValueChange = { q ->
+                                        userSearchQuery = q
+                                        selectedRecipientUser = null
+                                        selectedUserWallets = emptyList()
+                                        selectedUserWallet = null
+                                        if (q.length >= 2) viewModel.searchUsers(q) else viewModel.clearUserSearch()
+                                    },
+                                    label = { Text("Buscar destinatario por nombre o correo") },
+                                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(18.dp)) },
+                                    trailingIcon = if (userSearchQuery.isNotBlank()) {
+                                        {
+                                            IconButton(onClick = {
+                                                userSearchQuery = ""
+                                                selectedRecipientUser = null
+                                                selectedUserWallets = emptyList()
+                                                selectedUserWallet = null
+                                                viewModel.clearUserSearch()
+                                            }) { Icon(Icons.Default.Clear, null, modifier = Modifier.size(18.dp)) }
+                                        }
+                                    } else null,
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp),
                                     singleLine = true
                                 )
-                                OutlinedTextField(
-                                    value = extRecipientAlias,
-                                    onValueChange = { extRecipientAlias = it; viewModel.clearError() },
-                                    label = { Text("Alias / CBU / Cuenta *") },
-                                    leadingIcon = { Icon(Icons.Default.AlternateEmail, null, modifier = Modifier.size(18.dp)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    singleLine = true
-                                )
-                                OutlinedTextField(
-                                    value = extMotivo,
-                                    onValueChange = { extMotivo = it },
-                                    label = { Text("Motivo (opcional)") },
-                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null, modifier = Modifier.size(18.dp)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    singleLine = true
-                                )
-                                OutlinedTextField(
-                                    value = transferAmount,
-                                    onValueChange = {
-                                        val s = it.replace(",", ".")
-                                        if (s.isEmpty() || s.toDoubleOrNull() != null) {
-                                            if (!s.contains(".") || s.substringAfter(".").length <= 2) {
-                                                transferAmount = s; viewModel.clearError()
+
+                                // Estados del buscador
+                                when {
+                                    uiState.isSearchingUsers -> {
+                                        Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                        }
+                                    }
+                                    selectedRecipientUser != null -> {
+                                        // Usuario seleccionado
+                                        Card(
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                                        }
+                                                    }
+                                                    Column {
+                                                        Text(selectedRecipientUser!!.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                                        Text(selectedRecipientUser!!.email, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    }
+                                                }
+                                                IconButton(onClick = {
+                                                    selectedRecipientUser = null
+                                                    selectedUserWallets = emptyList()
+                                                    selectedUserWallet = null
+                                                    userSearchQuery = ""
+                                                }, modifier = Modifier.size(28.dp)) {
+                                                    Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
+                                                }
                                             }
                                         }
-                                    },
-                                    label = { Text("Monto (${viewModel.getCurrencySymbol(fromWallet?.currencyCode ?: "PEN")}) *") },
-                                    leadingIcon = { Icon(Icons.Default.AttachMoney, null, modifier = Modifier.size(18.dp)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                                    ),
-                                    singleLine = true
-                                )
-                                val extDateFmt = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
-                                OutlinedTextField(
-                                    value = extDateFmt.format(extTransferDate.time),
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text("Fecha") },
-                                    leadingIcon = { Icon(Icons.Default.CalendarToday, null) },
-                                    modifier = Modifier.fillMaxWidth().clickable { showExtDatePicker = true },
-                                    enabled = false,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
+
+                                        // Billeteras del destinatario
+                                        if (isLoadingUserWallets) {
+                                            Box(Modifier.fillMaxWidth().padding(4.dp), contentAlignment = Alignment.Center) {
+                                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                            }
+                                        } else if (selectedUserWallets.isNotEmpty()) {
+                                            Text("Billetera destino:", style = MaterialTheme.typography.labelLarge)
+                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                items(selectedUserWallets, key = { it.id }) { wallet ->
+                                                    val flag = currencies.find { c -> c.first == wallet.currencyCode }?.second?.take(2) ?: "💰"
+                                                    FilterChip(
+                                                        selected = selectedUserWallet?.id == wallet.id,
+                                                        onClick = {
+                                                            selectedUserWallet = wallet
+                                                            val cf = extFromWallet ?: fromWallet
+                                                            if (cf != null) viewModel.fetchExchangeRatePreview(cf.currencyCode, wallet.currencyCode)
+                                                        },
+                                                        label = { Text("$flag ${wallet.name} (${wallet.currencyCode})\n# ${wallet.accountId}") }
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Preview conversión inter-usuario
+                                        val cf = extFromWallet ?: fromWallet
+                                        if (selectedUserWallet != null && cf != null && cf.currencyCode != selectedUserWallet!!.currencyCode) {
+                                            if (uiState.isExchangeLoading) {
+                                                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                                }
+                                            } else {
+                                                val rate = uiState.exchangeRatePreview
+                                                if (rate != null) {
+                                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f))) {
+                                                        Column(modifier = Modifier.padding(12.dp)) {
+                                                            Text("Tipo de cambio:", style = MaterialTheme.typography.labelSmall)
+                                                            Text(
+                                                                "1 ${cf.currencyCode} = ${String.format("%.4f", rate)} ${selectedUserWallet!!.currencyCode}",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                            val amt = transferAmount.toDoubleOrNull() ?: 0.0
+                                                            if (amt > 0) {
+                                                                Text(
+                                                                    "Destinatario recibirá: ${viewModel.getCurrencySymbol(selectedUserWallet!!.currencyCode)} ${String.format("%.2f", amt * rate)}",
+                                                                    style = MaterialTheme.typography.bodyMedium,
+                                                                    color = MaterialTheme.colorScheme.primary
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Monto y motivo
+                                        OutlinedTextField(
+                                            value = transferAmount,
+                                            onValueChange = {
+                                                val s = it.replace(",", ".")
+                                                if (s.isEmpty() || s.toDoubleOrNull() != null) {
+                                                    if (!s.contains(".") || s.substringAfter(".").length <= 2) {
+                                                        transferAmount = s; viewModel.clearError()
+                                                    }
+                                                }
+                                            },
+                                            label = { Text("Monto (${viewModel.getCurrencySymbol((extFromWallet ?: fromWallet)?.currencyCode ?: "PEN")}) *") },
+                                            leadingIcon = { Icon(Icons.Default.AttachMoney, null, modifier = Modifier.size(18.dp)) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                                            singleLine = true
+                                        )
+                                        OutlinedTextField(
+                                            value = extMotivo,
+                                            onValueChange = { extMotivo = it },
+                                            label = { Text("Descripción / Motivo (opcional)") },
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null, modifier = Modifier.size(18.dp)) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            singleLine = true
+                                        )
+                                    }
+                                    uiState.userSearchResults.isNotEmpty() -> {
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            uiState.userSearchResults.take(5).forEach { user ->
+                                                Surface(
+                                                    onClick = {
+                                                        selectedRecipientUser = user
+                                                        isLoadingUserWallets = true
+                                                        viewModel.getUserWallets(user.email) { wallets ->
+                                                            selectedUserWallets = wallets
+                                                            isLoadingUserWallets = false
+                                                        }
+                                                        viewModel.clearUserSearch()
+                                                    },
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                                        Column {
+                                                            Text(user.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                                            Text(user.email, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    userSearchQuery.length >= 2 && !uiState.isSearchingUsers -> {
+                                        Text(
+                                            "No se encontraron usuarios con \"$userSearchQuery\"",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
                             }
 
                             if (uiState.errorMessage != null) {
@@ -1072,25 +1223,16 @@ fun DashboardScreen(
                                         }
                                     } else {
                                         val amt = transferAmount.toDoubleOrNull()
-                                        val from = fromWallet
+                                        val currentFrom = extFromWallet ?: fromWallet
+                                        val toUser = selectedRecipientUser
+                                        val toWallet = selectedUserWallet
                                         when {
-                                            extRecipientName.isBlank() -> viewModel.setError("El nombre del destinatario es requerido")
-                                            extRecipientAlias.isBlank() -> viewModel.setError("El alias o cuenta es requerido")
+                                            toUser == null -> viewModel.setError("Selecciona un destinatario usando el buscador")
+                                            toWallet == null -> viewModel.setError("Selecciona la billetera destino del destinatario")
+                                            currentFrom == null -> viewModel.setError("Selecciona una billetera de origen")
                                             amt == null || amt <= 0 -> viewModel.setError("Ingresa un monto válido")
-                                            from == null -> viewModel.setError("No hay billetera seleccionada")
-                                            amt > from.balance -> viewModel.setError("Saldo insuficiente")
-                                            else -> viewModel.addExternalTransfer(
-                                                fromWallet = from,
-                                                amount = amt,
-                                                contact = TransferContact(
-                                                    recipientName = extRecipientName.trim(),
-                                                    recipientAlias = extRecipientAlias.trim(),
-                                                    bank = extBank.trim(),
-                                                    motivo = extMotivo.trim()
-                                                ),
-                                                timestamp = extTransferDate.timeInMillis,
-                                                onSuccess = { resetAndClose() }
-                                            )
+                                            amt > currentFrom.balance -> viewModel.setError("Saldo insuficiente en ${currentFrom.name}")
+                                            else -> viewModel.transferToUser(currentFrom, toUser.email, toWallet, amt, extMotivo) { resetAndClose() }
                                         }
                                     }
                                 },
@@ -2011,6 +2153,8 @@ private fun WalletHeroCard(
     expenseTotal: Double,
     modifier: Modifier = Modifier
 ) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
     val baseColor = Color(wallet.color)
     val darkColor = remember(wallet.color) {
         val hsv = FloatArray(3)
@@ -2038,6 +2182,25 @@ private fun WalletHeroCard(
                         Text(wallet.name, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
                         Surface(shape = RoundedCornerShape(6.dp), color = Color.White.copy(alpha = 0.2f)) {
                             Text(wallet.currencyCode, style = MaterialTheme.typography.labelSmall, color = Color.White, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                        if (wallet.accountId.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "# ${wallet.accountId}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.65f),
+                                    fontSize = 10.sp
+                                )
+                                IconButton(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(wallet.accountId))
+                                        Toast.makeText(context, "ID copiado al portapapeles", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(20.dp)
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copiar ID", tint = Color.White.copy(alpha = 0.65f), modifier = Modifier.size(11.dp))
+                                }
+                            }
                         }
                     }
                     Row {
