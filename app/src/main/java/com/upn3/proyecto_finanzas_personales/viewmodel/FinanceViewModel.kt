@@ -407,6 +407,231 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun exportReportToPdf(
+        uri: Uri,
+        reportTitle: String,
+        dateRangeText: String,
+        transactions: List<Transaction>,
+        totalIncome: Double,
+        totalExpense: Double,
+        totalTransfer: Double,
+        currencySymbol: String,
+        context: android.content.Context
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            fun mkText(color: Int, size: Float, bold: Boolean = false) =
+                android.graphics.Paint().apply {
+                    this.color = color; textSize = size; isFakeBoldText = bold; isAntiAlias = true
+                }
+            fun mkFill(color: Int) = android.graphics.Paint().apply { this.color = color; isAntiAlias = true }
+            fun mkLine() = android.graphics.Paint().apply {
+                this.color = android.graphics.Color.parseColor("#E5E7EB")
+                style = android.graphics.Paint.Style.STROKE; strokeWidth = 0.5f; isAntiAlias = true
+            }
+            fun truncate(text: String, paint: android.graphics.Paint, maxWidth: Float): String {
+                if (paint.measureText(text) <= maxWidth) return text
+                var s = text
+                while (s.isNotEmpty() && paint.measureText("$s…") > maxWidth) s = s.dropLast(1)
+                return if (s.isEmpty()) "" else "$s…"
+            }
+            try {
+                val pdfDoc = android.graphics.pdf.PdfDocument()
+                val W = 595; val H = 842; val M = 36f; val CW = W - M * 2
+
+                val primaryDark = android.graphics.Color.parseColor("#1E1B4B")
+                val primary     = android.graphics.Color.parseColor("#4338CA")
+                val primaryLight= android.graphics.Color.parseColor("#C7D2FE")
+                val greenDark   = android.graphics.Color.parseColor("#064E3B")
+                val redDark     = android.graphics.Color.parseColor("#7F1D1D")
+                val grayText    = android.graphics.Color.parseColor("#374151")
+                val grayAlt     = android.graphics.Color.parseColor("#F3F4F6")
+                val white       = android.graphics.Color.WHITE
+
+                val dateFmt = java.text.SimpleDateFormat("dd/MM/yy HH:mm", java.util.Locale.getDefault())
+                val genDate = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+
+                val rowH = 16f; val tHdrH = 20f
+                val firstHdrH = 172f; val otherHdrH = 34f; val footerH = 26f
+
+                val colDateW = 72f; val colDescW = CW * 0.36f; val colCatW = CW * 0.22f; val colTypeW = 54f
+                val colAmtW = CW - colDateW - colDescW - colCatW - colTypeW
+                val colX = floatArrayOf(M, M + colDateW, M + colDateW + colDescW,
+                    M + colDateW + colDescW + colCatW, M + colDateW + colDescW + colCatW + colTypeW)
+
+                val rowsFirst = ((H - M - firstHdrH - tHdrH - footerH) / rowH).toInt().coerceAtLeast(1)
+                val rowsOther = ((H - M * 2 - otherHdrH - tHdrH - footerH) / rowH).toInt().coerceAtLeast(1)
+
+                val pages = mutableListOf<List<Transaction>>()
+                if (transactions.isEmpty()) { pages.add(emptyList()) }
+                else {
+                    pages.add(transactions.take(rowsFirst))
+                    var off = rowsFirst
+                    while (off < transactions.size) { pages.add(transactions.subList(off, minOf(off + rowsOther, transactions.size))); off += rowsOther }
+                }
+
+                pages.forEachIndexed { pIdx, pageTxs ->
+                    val pi = android.graphics.pdf.PdfDocument.PageInfo.Builder(W, H, pIdx + 1).create()
+                    val page = pdfDoc.startPage(pi)
+                    val cv = page.canvas
+                    var y = M
+
+                    if (pIdx == 0) {
+                        cv.drawRoundRect(android.graphics.RectF(M, y, W - M, y + 44f), 8f, 8f, mkFill(primaryDark))
+                        cv.drawText("FINANZAS", M + 14f, y + 29f, mkText(white, 20f, true))
+                        cv.drawText("Reporte Financiero Personal", W - M - 202f, y + 18f, mkText(primaryLight, 8.5f))
+                        cv.drawText("Generado: $genDate", W - M - 202f, y + 32f, mkText(primaryLight, 8f))
+                        y += 54f
+
+                        cv.drawText(reportTitle, M, y + 15f, mkText(primaryDark, 14f, true))
+                        cv.drawText(dateRangeText, M, y + 29f, mkText(grayText, 10f))
+                        y += 40f
+
+                        val netBal = totalIncome - totalExpense
+                        val cardW = (CW - 12f) / 3f
+                        val cards = listOf(
+                            Triple("INGRESOS", totalIncome, greenDark),
+                            Triple("GASTOS", totalExpense, redDark),
+                            Triple("BALANCE NETO", netBal,
+                                if (netBal >= 0) android.graphics.Color.parseColor("#1E3A5F")
+                                else android.graphics.Color.parseColor("#7C2D12"))
+                        )
+                        cards.forEachIndexed { i, (lbl, amt, col) ->
+                            val cx = M + i * (cardW + 6f)
+                            cv.drawRoundRect(android.graphics.RectF(cx, y, cx + cardW, y + 46f), 6f, 6f, mkFill(col))
+                            cv.drawText(lbl, cx + 8f, y + 14f, mkText(primaryLight, 7.5f, true))
+                            val pfx = when(lbl) { "INGRESOS" -> "+"; "BALANCE NETO" -> if (netBal >= 0) "+" else "-"; else -> "" }
+                            val absAmt = if (amt < 0) -amt else amt
+                            cv.drawText("$pfx$currencySymbol ${String.format("%.2f", absAmt)}", cx + 8f, y + 34f, mkText(white, 10f, true))
+                        }
+                        y += 56f
+
+                        if (totalTransfer > 0) {
+                            cv.drawRoundRect(android.graphics.RectF(M, y, W - M, y + 26f), 5f, 5f, mkFill(android.graphics.Color.parseColor("#3730A3")))
+                            cv.drawText("TRANSFERENCIAS", M + 10f, y + 17f, mkText(primaryLight, 8f, true))
+                            cv.drawText("$currencySymbol ${String.format("%.2f", totalTransfer)}", M + 140f, y + 17f, mkText(white, 10f, true))
+                            y += 34f
+                        } else { y += 4f }
+
+                        cv.drawLine(M, y, W.toFloat() - M, y, mkLine())
+                        y += 6f
+                        cv.drawText("Detalle de Movimientos", M, y + 12f, mkText(primaryDark, 11f, true))
+                        y += 20f
+                    } else {
+                        cv.drawRect(android.graphics.RectF(M, y, W.toFloat() - M, y + 24f), mkFill(primaryDark))
+                        cv.drawText("FINANZAS  —  $reportTitle", M + 8f, y + 16f, mkText(white, 9f, true))
+                        val pgLbl = "Pág. ${pIdx + 1} / ${pages.size}"
+                        val pgP = mkText(primaryLight, 8.5f).also { it.textAlign = android.graphics.Paint.Align.RIGHT }
+                        cv.drawText(pgLbl, W - M - 2f, y + 16f, pgP)
+                        y += 32f
+                    }
+
+                    cv.drawRect(android.graphics.RectF(M, y, W.toFloat() - M, y + tHdrH), mkFill(primary))
+                    val hp = mkText(white, 8.5f, true)
+                    listOf("Fecha", "Descripción", "Categoría", "Tipo", "Monto").forEachIndexed { i, lbl ->
+                        cv.drawText(lbl, colX[i] + 3f, y + 14f, hp)
+                    }
+                    y += tHdrH
+
+                    val cp = mkText(grayText, 8f)
+                    val ap = mkText(grayText, 8f, true)
+
+                    pageTxs.forEachIndexed { ri, tx ->
+                        cv.drawRect(android.graphics.RectF(M, y, W.toFloat() - M, y + rowH), mkFill(if (ri % 2 == 0) grayAlt else white))
+                        val txColor = when(tx.type) {
+                            TransactionType.INCOME   -> android.graphics.Color.parseColor("#065F46")
+                            TransactionType.EXPENSE  -> android.graphics.Color.parseColor("#991B1B")
+                            TransactionType.TRANSFER -> android.graphics.Color.parseColor("#3730A3")
+                        }
+                        val typeStr = when(tx.type) {
+                            TransactionType.INCOME -> "Ingreso"; TransactionType.EXPENSE -> "Gasto"; TransactionType.TRANSFER -> "Transfer."
+                        }
+                        val pfx = when(tx.type) { TransactionType.INCOME -> "+"; TransactionType.EXPENSE -> "-"; else -> "" }
+                        val ty = y + rowH - 4f
+                        cp.color = grayText
+                        cv.drawText(dateFmt.format(java.util.Date(tx.timestamp)), colX[0] + 2f, ty, cp)
+                        cv.drawText(truncate(tx.description, cp, colDescW - 6f), colX[1] + 2f, ty, cp)
+                        cv.drawText(truncate(tx.origin, cp, colCatW - 6f), colX[2] + 2f, ty, cp)
+                        cp.color = txColor; cv.drawText(typeStr, colX[3] + 2f, ty, cp)
+                        ap.color = txColor; cv.drawText("$pfx${String.format("%.2f", tx.amount)}", colX[4] + 2f, ty, ap)
+                        cv.drawLine(M, y + rowH, W.toFloat() - M, y + rowH, mkLine())
+                        y += rowH
+                    }
+
+                    if (pageTxs.isEmpty()) {
+                        cv.drawText("No hay transacciones en este periodo", M + 40f, y + 20f, mkText(android.graphics.Color.parseColor("#9CA3AF"), 10f))
+                    }
+
+                    val fY = H - 16f
+                    cv.drawLine(M, fY - 8f, W.toFloat() - M, fY - 8f, mkLine())
+                    cv.drawText("Finanzas App  •  $genDate", M, fY, mkText(android.graphics.Color.parseColor("#9CA3AF"), 7.5f))
+                    val pgNum = "Pág. ${pIdx + 1} de ${pages.size}"
+                    val pgNP = mkText(android.graphics.Color.parseColor("#9CA3AF"), 7.5f).also { it.textAlign = android.graphics.Paint.Align.RIGHT }
+                    cv.drawText(pgNum, W.toFloat() - M, fY, pgNP)
+
+                    pdfDoc.finishPage(page)
+                }
+
+                context.contentResolver.openOutputStream(uri)?.use { pdfDoc.writeTo(it) }
+                pdfDoc.close()
+                withContext(Dispatchers.Main) { _uiState.update { it.copy(errorMessage = "REPORT_PDF_OK") } }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { _uiState.update { it.copy(errorMessage = "Error al generar PDF: ${e.message}") } }
+            }
+        }
+    }
+
+    fun exportReportToCsv(
+        uri: Uri,
+        reportTitle: String,
+        dateRangeText: String,
+        transactions: List<Transaction>,
+        totalIncome: Double,
+        totalExpense: Double,
+        totalTransfer: Double,
+        currencySymbol: String,
+        context: android.content.Context
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val dateFmt = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                val genDate = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                val sb = StringBuilder()
+                sb.append('﻿') // BOM for Excel UTF-8
+                sb.appendLine("\"$reportTitle\"")
+                sb.appendLine("\"Período:\",\"$dateRangeText\"")
+                sb.appendLine("\"Generado:\",\"$genDate\"")
+                sb.appendLine()
+                sb.appendLine("\"--- RESUMEN ---\"")
+                sb.appendLine("\"Ingresos:\",\"$currencySymbol ${String.format("%.2f", totalIncome)}\"")
+                sb.appendLine("\"Gastos:\",\"$currencySymbol ${String.format("%.2f", totalExpense)}\"")
+                if (totalTransfer > 0) sb.appendLine("\"Transferencias:\",\"$currencySymbol ${String.format("%.2f", totalTransfer)}\"")
+                val netBal = totalIncome - totalExpense
+                val netPfx = if (netBal >= 0) "+" else ""
+                sb.appendLine("\"Balance Neto:\",\"$netPfx$currencySymbol ${String.format("%.2f", netBal)}\"")
+                sb.appendLine()
+                sb.appendLine("\"--- DETALLE DE MOVIMIENTOS ---\"")
+                sb.appendLine("\"Fecha\",\"Descripción\",\"Categoría/Origen\",\"Tipo\",\"Signo\",\"Monto\",\"Moneda\"")
+                transactions.forEach { tx ->
+                    val typeStr = when(tx.type) { TransactionType.INCOME -> "Ingreso"; TransactionType.EXPENSE -> "Gasto"; TransactionType.TRANSFER -> "Transferencia" }
+                    val sign = when(tx.type) { TransactionType.INCOME -> "+"; TransactionType.EXPENSE -> "-"; else -> "" }
+                    val date = dateFmt.format(java.util.Date(tx.timestamp))
+                    val desc = tx.description.replace("\"", "\"\"")
+                    val origin = tx.origin.replace("\"", "\"\"")
+                    sb.appendLine("\"$date\",\"$desc\",\"$origin\",\"$typeStr\",\"$sign\",\"${String.format("%.2f", tx.amount)}\",\"$currencySymbol\"")
+                }
+                sb.appendLine()
+                sb.appendLine("\"\",\"\",\"\",\"\",\"Total Ingresos:\",\"${String.format("%.2f", totalIncome)}\",\"$currencySymbol\"")
+                sb.appendLine("\"\",\"\",\"\",\"\",\"Total Gastos:\",\"${String.format("%.2f", totalExpense)}\",\"$currencySymbol\"")
+                if (totalTransfer > 0) sb.appendLine("\"\",\"\",\"\",\"\",\"Total Transfer.:\",\"${String.format("%.2f", totalTransfer)}\",\"$currencySymbol\"")
+                sb.appendLine("\"\",\"\",\"\",\"\",\"Balance Neto:\",\"$netPfx${String.format("%.2f", netBal)}\",\"$currencySymbol\"")
+                context.contentResolver.openOutputStream(uri)?.use { it.write(sb.toString().toByteArray(Charsets.UTF_8)) }
+                withContext(Dispatchers.Main) { _uiState.update { it.copy(errorMessage = "REPORT_CSV_OK") } }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { _uiState.update { it.copy(errorMessage = "Error al generar CSV: ${e.message}") } }
+            }
+        }
+    }
+
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
         if (email.isBlank() || pass.isBlank()) {
             _uiState.update { it.copy(errorMessage = "Ingresa correo y contraseña") }
@@ -790,8 +1015,24 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 "new" to (transaction.receiptPath ?: "")
             )
         }
-        val auditAction = if (auditChanges.size == 1 && auditChanges.containsKey("comprobante") && voucherAction != null)
-            voucherAction else AuditAction.EDICION
+        val locationAction = when {
+            oldTransaction?.latitude == null && transaction.latitude != null -> AuditAction.UBICACION_REGISTRADA
+            oldTransaction?.latitude != null && transaction.latitude == null -> AuditAction.UBICACION_ELIMINADA
+            oldTransaction?.latitude != null && transaction.latitude != null &&
+                    (oldTransaction.latitude != transaction.latitude || oldTransaction.longitude != transaction.longitude) -> AuditAction.UBICACION_ACTUALIZADA
+            else -> null
+        }
+        if (locationAction != null) {
+            auditChanges["ubicación"] = mapOf(
+                "old" to if (oldTransaction?.latitude != null) "${oldTransaction.latitude},${oldTransaction.longitude}" else "",
+                "new" to if (transaction.latitude != null) "${transaction.latitude},${transaction.longitude}" else ""
+            )
+        }
+        val auditAction = when {
+            auditChanges.size == 1 && voucherAction != null && auditChanges.containsKey("comprobante") -> voucherAction
+            auditChanges.size == 1 && locationAction != null && auditChanges.containsKey("ubicación") -> locationAction
+            else -> AuditAction.EDICION
+        }
 
         val updatedTransaction = transaction.copy(lastModified = System.currentTimeMillis())
         viewModelScope.launch {

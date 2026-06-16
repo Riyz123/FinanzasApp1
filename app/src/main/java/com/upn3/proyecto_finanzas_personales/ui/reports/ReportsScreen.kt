@@ -21,6 +21,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import com.upn3.proyecto_finanzas_personales.model.Transaction
 import com.upn3.proyecto_finanzas_personales.model.TransactionType
 import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
@@ -39,7 +42,11 @@ fun ReportsScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showDateRangePicker by remember { mutableStateOf(false) }
     var showTypeMenu by remember { mutableStateOf(false) }
-    
+    var showExportDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
     var customStartDate by remember { mutableStateOf<Long?>(null) }
     var customEndDate by remember { mutableStateOf<Long?>(null) }
 
@@ -53,6 +60,142 @@ fun ReportsScreen(
     )
 
     val dateRangePickerState = rememberDateRangePickerState()
+
+    // ── Report data (hoisted so launchers can capture it) ──────────────────────
+    val reportData = remember(uiState.transactions, reportType, selectedDate, customStartDate, customEndDate) {
+        val (start, end) = getPeriodBounds(reportType, selectedDate, customStartDate, customEndDate)
+        val filtered = uiState.transactions.filter {
+            it.timestamp in start..end &&
+            (it.origin != "Sistema" || it.description == "Ajuste de Saldo") &&
+            it.origin != "Ajuste de Moneda"
+        }
+        val sorted = filtered.sortedByDescending { it.timestamp }
+        var income = 0.0; var expense = 0.0; var transfer = 0.0
+        filtered.forEach {
+            when(it.type) {
+                TransactionType.INCOME   -> income += it.amount
+                TransactionType.EXPENSE  -> expense += it.amount
+                TransactionType.TRANSFER -> transfer += it.amount
+            }
+        }
+        Triple(sorted, Pair(income, expense), transfer)
+    }
+    val sortedTransactions = reportData.first
+    val (totalIncome, totalExpense) = reportData.second
+    val totalTransfer = reportData.third
+    val currentSymbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN")
+    val reportTitle = when(reportType) {
+        ReportType.DAILY   -> "Reporte Diario"
+        ReportType.WEEKLY  -> "Reporte Semanal"
+        ReportType.MONTHLY -> "Reporte Mensual"
+        ReportType.YEARLY  -> "Reporte Anual"
+        ReportType.CUSTOM  -> "Reporte Personalizado"
+    }
+    val reportDateText = getReportDateRangeText(reportType, selectedDate, customStartDate, customEndDate)
+    val exportFileName = remember(reportType, selectedDate) {
+        "reporte_finanzas_${SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())}"
+    }
+
+    // ── Export launchers ───────────────────────────────────────────────────────
+    val createPdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        viewModel.exportReportToPdf(uri, reportTitle, reportDateText, sortedTransactions,
+            totalIncome, totalExpense, totalTransfer, currentSymbol, context)
+    }
+    val createCsvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        viewModel.exportReportToCsv(uri, reportTitle, reportDateText, sortedTransactions,
+            totalIncome, totalExpense, totalTransfer, currentSymbol, context)
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        when (uiState.errorMessage) {
+            "REPORT_PDF_OK" -> {
+                snackbarHostState.showSnackbar("PDF exportado correctamente")
+                viewModel.clearError()
+            }
+            "REPORT_CSV_OK" -> {
+                snackbarHostState.showSnackbar("CSV exportado — ábrelo con Excel o Google Sheets")
+                viewModel.clearError()
+            }
+            else -> if (uiState.errorMessage?.startsWith("Error al generar") == true) {
+                snackbarHostState.showSnackbar(uiState.errorMessage!!)
+                viewModel.clearError()
+            }
+        }
+    }
+
+    // ── Export format dialog ───────────────────────────────────────────────────
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            icon = { Icon(Icons.Default.FileDownload, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Exportar Reporte", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Selecciona el formato para: $reportDateText",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Surface(
+                        onClick = { showExportDialog = false; createPdfLauncher.launch("$exportFileName.pdf") },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.error.copy(0.15f), modifier = Modifier.size(40.dp)) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
+                                }
+                            }
+                            Column {
+                                Text("PDF", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Text("Documento formateado, listo para imprimir o compartir",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    Surface(
+                        onClick = { showExportDialog = false; createCsvLauncher.launch("$exportFileName.csv") },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(0.15f), modifier = Modifier.size(40.dp)) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.GridOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                }
+                            }
+                            Column {
+                                Text("Excel / CSV", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Text("Tabla editable, compatible con Excel y Google Sheets",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showExportDialog = false }) { Text("Cancelar") } }
+        )
+    }
 
     if (showDateRangePicker) {
         DatePickerDialog(
@@ -129,12 +272,18 @@ fun ReportsScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Reportes", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showExportDialog = true }) {
+                        Icon(Icons.Default.Share, contentDescription = "Exportar reporte")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -242,37 +391,6 @@ fun ReportsScreen(
                     )
                 }
             }
-
-            // Summary Totals
-            val reportData = remember(uiState.transactions, reportType, selectedDate, customStartDate, customEndDate) {
-                val (start, end) = getPeriodBounds(reportType, selectedDate, customStartDate, customEndDate)
-                // Incluir transacciones normales y ajustes de saldo, pero ignorar otros eventos de sistema
-                val filtered = uiState.transactions.filter { 
-                    it.timestamp in start..end && 
-                    (it.origin != "Sistema" || it.description == "Ajuste de Saldo") &&
-                    it.origin != "Ajuste de Moneda"
-                }
-                val sorted = filtered.sortedByDescending { it.timestamp }
-                
-                var income = 0.0
-                var expense = 0.0
-                var transfer = 0.0
-                
-                filtered.forEach { 
-                    when(it.type) {
-                        TransactionType.INCOME -> income += it.amount
-                        TransactionType.EXPENSE -> expense += it.amount
-                        TransactionType.TRANSFER -> transfer += it.amount
-                    }
-                }
-                
-                Triple(sorted, Pair(income, expense), transfer)
-            }
-
-            val sortedTransactions = reportData.first
-            val (totalIncome, totalExpense) = reportData.second
-            val totalTransfer = reportData.third
-            val currentSymbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN")
 
             // ── Balance neto ──────────────────────────────────────────────────
             val netBalance = totalIncome - totalExpense

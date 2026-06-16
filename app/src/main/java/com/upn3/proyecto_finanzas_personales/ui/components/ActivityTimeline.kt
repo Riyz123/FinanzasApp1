@@ -69,14 +69,17 @@ fun ActivityTimeline(
 private data class EventStyle(val icon: ImageVector, val color: Color, val title: String)
 
 private fun resolveEvent(log: AuditLog): EventStyle = when (log.action) {
-    AuditAction.CREACION          -> EventStyle(Icons.Default.Add,           Color(0xFF2E7D32), "Transacción creada")
-    AuditAction.EDICION           -> EventStyle(Icons.Default.Edit,          Color(0xFF1565C0), "Transacción editada")
-    AuditAction.VOUCHER_AGREGADO  -> EventStyle(Icons.Default.Receipt,       Color(0xFF00695C), "Comprobante adjuntado")
-    AuditAction.VOUCHER_ELIMINADO -> EventStyle(Icons.Default.DeleteForever, Color(0xFFC62828), "Comprobante eliminado")
-    AuditAction.VOUCHER_REEMPLAZADO -> EventStyle(Icons.Default.SwapVert,   Color(0xFFE65100), "Comprobante reemplazado")
-    AuditAction.TRANSFERENCIA     -> EventStyle(Icons.Default.SwapHoriz,     Color(0xFF6A1B9A), "Transferencia registrada")
-    AuditAction.ELIMINACION       -> EventStyle(Icons.Default.Delete,        Color(0xFFC62828), "Transacción eliminada")
-    else                          -> EventStyle(Icons.Default.Info,          Color(0xFF546E7A), log.action)
+    AuditAction.CREACION             -> EventStyle(Icons.Default.Add,           Color(0xFF2E7D32), "Transacción creada")
+    AuditAction.EDICION              -> EventStyle(Icons.Default.Edit,          Color(0xFF1565C0), "Transacción editada")
+    AuditAction.VOUCHER_AGREGADO     -> EventStyle(Icons.Default.Receipt,       Color(0xFF00695C), "Comprobante adjuntado")
+    AuditAction.VOUCHER_ELIMINADO    -> EventStyle(Icons.Default.DeleteForever, Color(0xFFC62828), "Comprobante eliminado")
+    AuditAction.VOUCHER_REEMPLAZADO  -> EventStyle(Icons.Default.SwapVert,      Color(0xFFE65100), "Comprobante reemplazado")
+    AuditAction.TRANSFERENCIA        -> EventStyle(Icons.Default.SwapHoriz,     Color(0xFF6A1B9A), "Transferencia registrada")
+    AuditAction.ELIMINACION          -> EventStyle(Icons.Default.Delete,        Color(0xFFC62828), "Transacción eliminada")
+    AuditAction.UBICACION_REGISTRADA -> EventStyle(Icons.Default.LocationOn,    Color(0xFF00838F), "Ubicación registrada")
+    AuditAction.UBICACION_ACTUALIZADA-> EventStyle(Icons.Default.EditLocation,  Color(0xFF0277BD), "Ubicación actualizada")
+    AuditAction.UBICACION_ELIMINADA  -> EventStyle(Icons.Default.LocationOff,   Color(0xFF6D4C41), "Ubicación eliminada")
+    else                             -> EventStyle(Icons.Default.Info,          Color(0xFF546E7A), log.action)
 }
 
 private fun buildDetails(log: AuditLog): List<String> {
@@ -100,6 +103,9 @@ private fun buildDetails(log: AuditLog): List<String> {
             }
             field == "monto" && old.isEmpty() -> "Monto: $new"
             field == "monto" -> "Monto: $old → $new"
+            field == "ubicación" && old.isEmpty() -> "Ubicación capturada"
+            field == "ubicación" && new.isEmpty() -> "Ubicación eliminada"
+            field == "ubicación" -> "Ubicación actualizada"
             else -> "${field.replaceFirstChar { it.uppercase() }}: $old → $new"
         }
     }

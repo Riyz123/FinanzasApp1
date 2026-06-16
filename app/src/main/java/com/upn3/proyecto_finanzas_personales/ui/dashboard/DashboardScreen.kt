@@ -35,6 +35,7 @@ import com.upn3.proyecto_finanzas_personales.model.TransactionType
 import com.upn3.proyecto_finanzas_personales.model.TransferContact
 import com.upn3.proyecto_finanzas_personales.model.Wallet
 import com.upn3.proyecto_finanzas_personales.ui.components.ConversionDetailDialog
+import com.upn3.proyecto_finanzas_personales.location.LocationHelper
 import com.upn3.proyecto_finanzas_personales.ui.components.NumericKeyboard
 import com.upn3.proyecto_finanzas_personales.ui.components.TransactionDetailDialog
 import com.upn3.proyecto_finanzas_personales.ui.theme.AppTheme
@@ -82,13 +83,16 @@ fun DashboardScreen(
     var selectedTransactionDetail by remember { mutableStateOf<Transaction?>(null) }
     var showTransactionDetailDialog by remember { mutableStateOf(false) }
     var selectedCategoryIcon by remember { mutableStateOf("Category") }
-    var showVoucherDialog by remember {mutableStateOf(false)}
+    var showVoucherDialog by remember { mutableStateOf(false) }
     var editAmount by remember { mutableStateOf("") }
     var editDescription by remember { mutableStateOf("") }
     var editCategory by remember { mutableStateOf<Category?>(null) }
     var editDate by remember { mutableStateOf(Calendar.getInstance()) }
     var showEditDatePicker by remember { mutableStateOf(false) }
     var editReceiptPath by remember { mutableStateOf<String?>(null) }
+    var editLatitude by remember { mutableStateOf<Double?>(null) }
+    var editLongitude by remember { mutableStateOf<Double?>(null) }
+    var editLocationStatus by remember { mutableStateOf("idle") } // idle | capturing | captured | error
 
     val searchQuery = uiState.searchQuery
     val selectedTab = uiState.selectedTab
@@ -493,6 +497,9 @@ fun DashboardScreen(
                                 editDescription = transaction.description
                                 editCategory = uiState.categories.find { it.name == transaction.origin }
                                 editReceiptPath = transaction.receiptPath
+                                editLatitude = transaction.latitude
+                                editLongitude = transaction.longitude
+                                editLocationStatus = if (transaction.latitude != null) "captured" else "idle"
                                 showEditTransactionDialog = true
                                 editDate = Calendar.getInstance().apply { timeInMillis = transaction.timestamp }
                                 viewModel.clearError()
@@ -1477,6 +1484,122 @@ fun DashboardScreen(
                                 shape = RoundedCornerShape(12.dp)
                             )
 
+                            // Ubicación GPS
+                            run {
+                                val locationHelper = remember { LocationHelper(context) }
+                                val locationPermLauncher = rememberLauncherForActivityResult(
+                                    ActivityResultContracts.RequestPermission()
+                                ) { granted ->
+                                    if (granted) {
+                                        editLocationStatus = "capturing"
+                                        scope.launch {
+                                            val loc = locationHelper.getCurrentLocation()
+                                            if (loc != null) {
+                                                editLatitude = loc.first
+                                                editLongitude = loc.second
+                                                editLocationStatus = "captured"
+                                            } else {
+                                                editLocationStatus = "error"
+                                            }
+                                        }
+                                    } else {
+                                        editLocationStatus = "denied"
+                                    }
+                                }
+                                val locColor = when (editLocationStatus) {
+                                    "captured" -> MaterialTheme.colorScheme.primary
+                                    "capturing" -> MaterialTheme.colorScheme.secondary
+                                    "error", "denied" -> MaterialTheme.colorScheme.error
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = locColor.copy(alpha = 0.08f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            if (editLocationStatus == "capturing") {
+                                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = locColor)
+                                            } else {
+                                                Icon(
+                                                    when (editLocationStatus) {
+                                                        "captured" -> Icons.Default.LocationOn
+                                                        "error", "denied" -> Icons.Default.LocationOff
+                                                        else -> Icons.Default.LocationSearching
+                                                    },
+                                                    null, tint = locColor, modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            Column {
+                                                Text(
+                                                    when (editLocationStatus) {
+                                                        "captured" -> "Ubicación capturada"
+                                                        "capturing" -> "Capturando GPS..."
+                                                        "error" -> "Sin señal GPS"
+                                                        "denied" -> "Permiso denegado"
+                                                        else -> "Sin ubicación registrada"
+                                                    },
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = locColor
+                                                )
+                                                if (editLatitude != null) {
+                                                    Text(
+                                                        "${"%.5f".format(editLatitude)}, ${"%.5f".format(editLongitude)}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = locColor.copy(alpha = 0.7f)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            if (editLatitude != null) {
+                                                IconButton(
+                                                    onClick = { editLatitude = null; editLongitude = null; editLocationStatus = "idle" },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                                }
+                                            }
+                                            TextButton(
+                                                onClick = {
+                                                    editLocationStatus = "capturing"
+                                                    scope.launch {
+                                                        val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                                                            context, android.Manifest.permission.ACCESS_FINE_LOCATION
+                                                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                                        if (hasPerm) {
+                                                            val loc = locationHelper.getCurrentLocation()
+                                                            if (loc != null) {
+                                                                editLatitude = loc.first
+                                                                editLongitude = loc.second
+                                                                editLocationStatus = "captured"
+                                                            } else {
+                                                                editLocationStatus = "error"
+                                                            }
+                                                        } else {
+                                                            locationPermLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                                                        }
+                                                    }
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    if (editLatitude != null) "Actualizar" else "Capturar",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = locColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // Listado de Categorías
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("Categoría", style = MaterialTheme.typography.labelLarge)
@@ -1576,7 +1699,9 @@ fun DashboardScreen(
                                                 description = editDescription,
                                                 origin = editCategory!!.name,
                                                 timestamp = editDate.timeInMillis,
-                                                receiptPath = editReceiptPath
+                                                receiptPath = editReceiptPath,
+                                                latitude = editLatitude,
+                                                longitude = editLongitude
                                             )
                                             viewModel.updateTransaction(updated) {
                                                 showEditTransactionDialog = false
