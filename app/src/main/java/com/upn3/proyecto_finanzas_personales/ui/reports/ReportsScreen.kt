@@ -1,10 +1,17 @@
 package com.upn3.proyecto_finanzas_personales.ui.reports
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +23,8 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,7 +43,7 @@ import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
 fun ReportsScreen(
     viewModel: FinanceViewModel,
@@ -49,6 +58,9 @@ fun ReportsScreen(
     var showExportDialog by remember { mutableStateOf(false) }
     var showMonthPicker by remember { mutableStateOf(false) }
     var showYearPicker by remember { mutableStateOf(false) }
+    // null = billetera actualmente seleccionada; "all" = todas las billeteras
+    var reportWalletFilter by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -74,20 +86,24 @@ fun ReportsScreen(
     val dateRangePickerState = rememberDateRangePickerState()
 
     // ── Report data (hoisted so launchers can capture it) ──────────────────────
-    val reportData = remember(uiState.transactions, uiState.convertedTransactions, reportType, selectedDate, customStartDate, customEndDate) {
+    val isAllWallets = reportWalletFilter == "all"
+    val reportData = remember(uiState.transactions, uiState.convertedTransactions, uiState.allWalletTransactions, reportType, selectedDate, customStartDate, customEndDate, reportWalletFilter) {
         val (start, end) = getPeriodBounds(reportType, selectedDate, customStartDate, customEndDate)
 
-        // Display list: raw transactions with each transaction's original currency.
-        // Mirrors Dashboard Tab-0 list — shows every movement, including "Ajuste de Moneda".
-        val displayList = uiState.transactions.filter {
+        val rawSource = when {
+            isAllWallets -> uiState.allWalletTransactions
+            reportWalletFilter != null -> uiState.allWalletTransactions.filter { it.walletId == reportWalletFilter }
+            else -> uiState.transactions
+        }
+        val displayList = rawSource.filter {
             it.timestamp in start..end &&
             (it.origin != "Sistema" || it.description.contains("Ajuste", ignoreCase = true))
         }.sortedByDescending { it.timestamp }
 
-        // Totals: use convertedTransactions (amounts already in wallet currency, same source as
-        // Dashboard's StatisticsSection / calculateChartTotals). Falls back to raw transactions
-        // only if convertedTransactions hasn't been loaded yet.
-        val sourceForTotals = uiState.convertedTransactions.ifEmpty { uiState.transactions }
+        val sourceForTotals = when {
+            isAllWallets || reportWalletFilter != null -> rawSource
+            else -> uiState.convertedTransactions.ifEmpty { uiState.transactions }
+        }
         var income = 0.0; var expense = 0.0; var transfer = 0.0
         sourceForTotals.filter { tx ->
             tx.timestamp in start..end &&
@@ -96,7 +112,11 @@ fun ReportsScreen(
             when (tx.type) {
                 TransactionType.INCOME   -> income += tx.amount
                 TransactionType.EXPENSE  -> expense += tx.amount
-                TransactionType.TRANSFER -> transfer += tx.amount
+                TransactionType.TRANSFER -> {
+                    val desc = tx.description.lowercase()
+                    if (desc.startsWith("de ") || desc.startsWith("transferencia de ")) income += tx.amount
+                    else expense += tx.amount
+                }
             }
         }
         Triple(displayList, Pair(income, expense), transfer)
@@ -104,7 +124,14 @@ fun ReportsScreen(
     val sortedTransactions = reportData.first
     val (totalIncome, totalExpense) = reportData.second
     val totalTransfer = reportData.third
-    val currentSymbol = viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN")
+    val reportWalletName = when {
+        isAllWallets -> "Todas las billeteras"
+        reportWalletFilter != null -> uiState.wallets.find { it.id == reportWalletFilter }?.name ?: uiState.selectedWallet?.name ?: ""
+        else -> uiState.selectedWallet?.name ?: ""
+    }
+    val currentSymbol = if (isAllWallets) "" else viewModel.getCurrencySymbol(
+        (if (reportWalletFilter != null) uiState.wallets.find { it.id == reportWalletFilter } else uiState.selectedWallet)?.currencyCode ?: "PEN"
+    )
     val reportTitle = when(reportType) {
         ReportType.DAILY   -> "Reporte Diario"
         ReportType.MONTHLY -> "Reporte Mensual"
@@ -112,24 +139,34 @@ fun ReportsScreen(
         ReportType.CUSTOM  -> "Reporte Personalizado"
     }
     val reportDateText = getReportDateRangeText(reportType, selectedDate, customStartDate, customEndDate)
+    val exportTitle = "$reportTitle${if (reportWalletName.isNotBlank()) " — $reportWalletName" else ""}"
     val exportFileName = remember(reportType, selectedDate) {
         "reporte_finanzas_${SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())}"
     }
+
+    // Capture mutable state for launchers (closures re-evaluated each recomposition via rememberUpdatedState)
+    val latestSortedTx by rememberUpdatedState(sortedTransactions)
+    val latestIncome by rememberUpdatedState(totalIncome)
+    val latestExpense by rememberUpdatedState(totalExpense)
+    val latestTransfer by rememberUpdatedState(totalTransfer)
+    val latestSymbol by rememberUpdatedState(currentSymbol)
+    val latestTitle by rememberUpdatedState(exportTitle)
+    val latestDateText by rememberUpdatedState(reportDateText)
 
     // ── Export launchers ───────────────────────────────────────────────────────
     val createPdfLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/pdf")
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        viewModel.exportReportToPdf(uri, reportTitle, reportDateText, sortedTransactions,
-            totalIncome, totalExpense, totalTransfer, currentSymbol, context)
+        viewModel.exportReportToPdf(uri, latestTitle, latestDateText, latestSortedTx,
+            latestIncome, latestExpense, latestTransfer, latestSymbol, context)
     }
     val createCsvLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        viewModel.exportReportToCsv(uri, reportTitle, reportDateText, sortedTransactions,
-            totalIncome, totalExpense, totalTransfer, currentSymbol, context)
+        viewModel.exportReportToCsv(uri, latestTitle, latestDateText, latestSortedTx,
+            latestIncome, latestExpense, latestTransfer, latestSymbol, context)
     }
 
     LaunchedEffect(uiState.errorMessage) {
@@ -147,6 +184,11 @@ fun ReportsScreen(
                 viewModel.clearError()
             }
         }
+    }
+
+    // Resetear scroll al inicio al cambiar billetera o periodo (sin animación para evitar flicker)
+    LaunchedEffect(reportWalletFilter, reportType) {
+        listState.scrollToItem(0)
     }
 
     // ── Export format dialog ───────────────────────────────────────────────────
@@ -576,36 +618,74 @@ fun ReportsScreen(
                 }
             }
 
-            // ── Balance neto ──────────────────────────────────────────────────
-            val netBalance = totalIncome - totalExpense
-            val netPct = if (totalIncome > 0) (netBalance / totalIncome).toFloat().coerceIn(0f, 1f) else 0f
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ReportSummaryCard(label = "Ingresos", amount = totalIncome, color = MaterialTheme.colorScheme.primary, symbol = currentSymbol, icon = Icons.AutoMirrored.Filled.TrendingUp, modifier = Modifier.weight(1f))
-                    ReportSummaryCard(label = "Gastos", amount = totalExpense, color = MaterialTheme.colorScheme.error, symbol = currentSymbol, icon = Icons.AutoMirrored.Filled.TrendingDown, modifier = Modifier.weight(1f))
+            // ── Selector de billetera ─────────────────────────────────────────
+            LazyRow(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    FilterChip(
+                        selected = reportWalletFilter == "all",
+                        onClick = { reportWalletFilter = "all" },
+                        label = { Text("Todas las billeteras") },
+                        leadingIcon = {
+                            if (reportWalletFilter == "all") Icon(Icons.Default.AccountBalanceWallet, null, modifier = Modifier.size(16.dp))
+                        }
+                    )
                 }
-                if (totalTransfer > 0) {
-                    Spacer(Modifier.height(8.dp))
-                    ReportSummaryCard(label = "Transferencias", amount = totalTransfer, color = MaterialTheme.colorScheme.secondary, symbol = currentSymbol, icon = Icons.Default.SwapHoriz, modifier = Modifier.fillMaxWidth())
+                items(uiState.wallets) { w ->
+                    val isSelected = reportWalletFilter == null && w.id == uiState.selectedWallet?.id ||
+                                     reportWalletFilter == w.id
+                    FilterChip(
+                        selected = isSelected,
+                        // Sólo filtro local — sin selectWallet() para no disparar isLoading
+                        onClick = {
+                            reportWalletFilter = if (w.id == uiState.selectedWallet?.id) null else w.id
+                        },
+                        label = { Text(w.name) }
+                    )
                 }
-                Spacer(Modifier.height(10.dp))
-                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Balance neto", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(
-                                "${if (netBalance >= 0) "+" else ""}$currentSymbol ${String.format("%.2f", netBalance)}",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (netBalance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            }
+
+            // ── Tarjetas resumen con crossfade al cambiar billetera ───────────
+            // La key combina el filtro + los totales para animar cuando cambian los datos
+            AnimatedContent(
+                targetState = Triple(reportWalletFilter, totalIncome, totalExpense),
+                transitionSpec = {
+                    fadeIn(tween(180)) togetherWith fadeOut(tween(100))
+                },
+                label = "report-summary"
+            ) { (_, animIncome, animExpense) ->
+                val netBalance = animIncome - animExpense
+                val netPct = if (animIncome > 0) (netBalance / animIncome).toFloat().coerceIn(0f, 1f) else 0f
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ReportSummaryCard(label = "Ingresos", amount = animIncome, color = MaterialTheme.colorScheme.primary, symbol = currentSymbol, icon = Icons.AutoMirrored.Filled.TrendingUp, modifier = Modifier.weight(1f))
+                        ReportSummaryCard(label = "Gastos", amount = animExpense, color = MaterialTheme.colorScheme.error, symbol = currentSymbol, icon = Icons.AutoMirrored.Filled.TrendingDown, modifier = Modifier.weight(1f))
+                    }
+                    if (totalTransfer > 0) {
+                        Spacer(Modifier.height(8.dp))
+                        ReportSummaryCard(label = "Transferencias", amount = totalTransfer, color = MaterialTheme.colorScheme.secondary, symbol = currentSymbol, icon = Icons.Default.SwapHoriz, modifier = Modifier.fillMaxWidth())
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Balance neto", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    "${if (netBalance >= 0) "+" else ""}$currentSymbol ${String.format("%.2f", netBalance)}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (netBalance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
+                            }
+                            LinearProgressIndicator(
+                                progress = { netPct },
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                color = if (netBalance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                             )
                         }
-                        LinearProgressIndicator(
-                            progress = { netPct },
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                            color = if (netBalance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                        )
                     }
                 }
             }
@@ -619,6 +699,7 @@ fun ReportsScreen(
             )
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {

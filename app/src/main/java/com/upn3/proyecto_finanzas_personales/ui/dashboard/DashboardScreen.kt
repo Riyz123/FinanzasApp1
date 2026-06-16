@@ -41,6 +41,7 @@ import com.upn3.proyecto_finanzas_personales.ui.components.TransactionDetailDial
 import com.upn3.proyecto_finanzas_personales.ui.theme.AppTheme
 import com.upn3.proyecto_finanzas_personales.viewmodel.FinanceViewModel
 import com.upn3.proyecto_finanzas_personales.viewmodel.UserSearchResult
+import com.upn3.proyecto_finanzas_personales.viewmodel.WalletLookupResult
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import android.widget.Toast
@@ -116,8 +117,10 @@ fun DashboardScreen(
     var userSearchQuery by remember { mutableStateOf("") }
     var selectedRecipientUser by remember { mutableStateOf<UserSearchResult?>(null) }
     var selectedUserWallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
-    var selectedUserWallet by remember { mutableStateOf<Wallet?>(null) }
     var isLoadingUserWallets by remember { mutableStateOf(false) }
+    var accountIdInput by remember { mutableStateOf("") }
+    var walletLookupResult by remember { mutableStateOf<WalletLookupResult?>(null) }
+    var lookupError by remember { mutableStateOf<String?>(null) }
     var extFromWallet by remember { mutableStateOf<Wallet?>(null) }
     var showAddWalletDialog by remember { mutableStateOf(false) }
     var showEditWalletDialog by remember { mutableStateOf(false) }
@@ -187,12 +190,26 @@ fun DashboardScreen(
     val pageCount = uiState.wallets.size + 1
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { pageCount })
 
-    // Sincronizar el Pager con la billetera seleccionada (ViewModel -> UI)
+    // Sincronizar el Pager con la billetera seleccionada (ViewModel → UI)
     LaunchedEffect(uiState.selectedWallet?.id) {
         val idx = uiState.wallets.indexOfFirst { it.id == uiState.selectedWallet?.id }
         if (idx >= 0 && idx != pagerState.currentPage) {
             pagerState.animateScrollToPage(idx)
         }
+    }
+
+    // Sincronizar el Pager con el ViewModel (UI → ViewModel) cuando el usuario desliza.
+    // Usamos viewModel.uiState.value para siempre leer el estado actual dentro del coroutine.
+    // selectWallet() ya no llama a calculateGlobalBalance() → sin isLoading=true → sin pantalla blanca.
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }
+            .collect { page ->
+                val currentState = viewModel.uiState.value
+                val wallet = currentState.wallets.getOrNull(page)
+                if (wallet != null && wallet.id != currentState.selectedWallet?.id) {
+                    viewModel.selectWallet(wallet)
+                }
+            }
     }
 
     Scaffold(
@@ -820,9 +837,9 @@ fun DashboardScreen(
     if (showTransferDialog) {
         val fromWallet = uiState.selectedWallet
 
-        LaunchedEffect(selectedToWallet?.id, selectedUserWallet?.id, extFromWallet?.id, transferMode) {
+        LaunchedEffect(selectedToWallet?.id, walletLookupResult?.wallet?.id, extFromWallet?.id, transferMode) {
             val currentFrom = if (transferMode == 1) (extFromWallet ?: fromWallet) else fromWallet
-            val toW = if (transferMode == 0) selectedToWallet else selectedUserWallet
+            val toW = if (transferMode == 0) selectedToWallet else walletLookupResult?.wallet
             if (currentFrom != null && toW != null) {
                 viewModel.fetchExchangeRatePreview(currentFrom.currencyCode, toW.currencyCode)
             }
@@ -841,8 +858,10 @@ fun DashboardScreen(
             userSearchQuery = ""
             selectedRecipientUser = null
             selectedUserWallets = emptyList()
-            selectedUserWallet = null
             isLoadingUserWallets = false
+            accountIdInput = ""
+            walletLookupResult = null
+            lookupError = null
             extFromWallet = null
             viewModel.clearUserSearch()
             viewModel.clearError()
@@ -1003,107 +1022,214 @@ fun DashboardScreen(
                                             selected = isSel,
                                             onClick = {
                                                 extFromWallet = wallet
-                                                if (selectedUserWallet != null) viewModel.fetchExchangeRatePreview(wallet.currencyCode, selectedUserWallet!!.currencyCode)
+                                                val destWallet = walletLookupResult?.wallet
+                                                if (destWallet != null) viewModel.fetchExchangeRatePreview(wallet.currencyCode, destWallet.currencyCode)
                                             },
                                             label = { Text("$flag ${wallet.name} (${wallet.currencyCode})") }
                                         )
                                     }
                                 }
 
-                                // Buscador de usuario
-                                OutlinedTextField(
-                                    value = userSearchQuery,
-                                    onValueChange = { q ->
-                                        userSearchQuery = q
-                                        selectedRecipientUser = null
-                                        selectedUserWallets = emptyList()
-                                        selectedUserWallet = null
-                                        if (q.length >= 2) viewModel.searchUsers(q) else viewModel.clearUserSearch()
-                                    },
-                                    label = { Text("Buscar destinatario por nombre o correo") },
-                                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(18.dp)) },
-                                    trailingIcon = if (userSearchQuery.isNotBlank()) {
-                                        {
-                                            IconButton(onClick = {
-                                                userSearchQuery = ""
-                                                selectedRecipientUser = null
-                                                selectedUserWallets = emptyList()
-                                                selectedUserWallet = null
-                                                viewModel.clearUserSearch()
-                                            }) { Icon(Icons.Default.Clear, null, modifier = Modifier.size(18.dp)) }
-                                        }
-                                    } else null,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    singleLine = true
-                                )
+                                // ── Paso 1: Buscar destinatario ──
+                                if (selectedRecipientUser == null) {
+                                    OutlinedTextField(
+                                        value = userSearchQuery,
+                                        onValueChange = { q ->
+                                            userSearchQuery = q
+                                            accountIdInput = ""
+                                            walletLookupResult = null
+                                            lookupError = null
+                                            if (q.length >= 2) viewModel.searchUsers(q) else viewModel.clearUserSearch()
+                                        },
+                                        label = { Text("Buscar destinatario por nombre o correo") },
+                                        leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(18.dp)) },
+                                        trailingIcon = if (userSearchQuery.isNotBlank()) {
+                                            {
+                                                IconButton(onClick = {
+                                                    userSearchQuery = ""
+                                                    viewModel.clearUserSearch()
+                                                }) { Icon(Icons.Default.Clear, null, modifier = Modifier.size(18.dp)) }
+                                            }
+                                        } else null,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        singleLine = true
+                                    )
 
-                                // Estados del buscador
-                                when {
-                                    uiState.isSearchingUsers -> {
-                                        Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
-                                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    when {
+                                        uiState.isSearchingUsers -> {
+                                            Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                            }
+                                        }
+                                        uiState.userSearchResults.isNotEmpty() -> {
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                uiState.userSearchResults.take(5).forEach { user ->
+                                                    Surface(
+                                                        onClick = {
+                                                            selectedRecipientUser = user
+                                                            userSearchQuery = ""
+                                                            isLoadingUserWallets = true
+                                                            selectedUserWallets = emptyList()
+                                                            viewModel.clearUserSearch()
+                                                            viewModel.getUserWallets(user.email) { wallets ->
+                                                                selectedUserWallets = wallets
+                                                                isLoadingUserWallets = false
+                                                            }
+                                                        },
+                                                        shape = RoundedCornerShape(10.dp),
+                                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                        ) {
+                                                            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                                            Column {
+                                                                Text(user.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                                                Text(user.email, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        userSearchQuery.length >= 2 && !uiState.isSearchingUsers -> {
+                                            Text(
+                                                "No se encontraron usuarios con \"$userSearchQuery\"",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
                                         }
                                     }
-                                    selectedRecipientUser != null -> {
-                                        // Usuario seleccionado
+                                } else {
+                                    // ── Paso 2: Usuario seleccionado — ingresar número de cuenta ──
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.size(34.dp)) {
+                                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                        Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                                    }
+                                                }
+                                                Column {
+                                                    Text(selectedRecipientUser!!.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                                    Text(selectedRecipientUser!!.email, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
+                                            IconButton(onClick = {
+                                                selectedRecipientUser = null
+                                                selectedUserWallets = emptyList()
+                                                accountIdInput = ""
+                                                walletLookupResult = null
+                                                lookupError = null
+                                            }, modifier = Modifier.size(28.dp)) {
+                                                Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                    }
+
+                                    if (isLoadingUserWallets) {
+                                        Box(Modifier.fillMaxWidth().padding(4.dp), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                        }
+                                    } else if (walletLookupResult == null) {
+                                        // Ingresar número de cuenta
+                                        Text("Ingresa el número de cuenta destino:", style = MaterialTheme.typography.labelLarge)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            OutlinedTextField(
+                                                value = accountIdInput,
+                                                onValueChange = { v ->
+                                                    if (v.length <= 12 && v.all { it.isDigit() }) {
+                                                        accountIdInput = v
+                                                        lookupError = null
+                                                    }
+                                                },
+                                                label = { Text("12 dígitos") },
+                                                leadingIcon = { Icon(Icons.Default.CreditCard, null, modifier = Modifier.size(18.dp)) },
+                                                trailingIcon = if (accountIdInput.isNotBlank()) {
+                                                    { IconButton(onClick = { accountIdInput = ""; lookupError = null }) { Icon(Icons.Default.Clear, null, modifier = Modifier.size(18.dp)) } }
+                                                } else null,
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(12.dp),
+                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                singleLine = true
+                                            )
+                                            Button(
+                                                onClick = {
+                                                    val found = selectedUserWallets.find { it.accountId == accountIdInput }
+                                                    if (found != null) {
+                                                        walletLookupResult = WalletLookupResult(
+                                                            ownerEmail = selectedRecipientUser!!.email,
+                                                            ownerName = selectedRecipientUser!!.displayName,
+                                                            wallet = found
+                                                        )
+                                                        lookupError = null
+                                                        val cf = extFromWallet ?: fromWallet
+                                                        if (cf != null) viewModel.fetchExchangeRatePreview(cf.currencyCode, found.currencyCode)
+                                                    } else {
+                                                        lookupError = "Número de cuenta incorrecto para este usuario."
+                                                    }
+                                                },
+                                                enabled = accountIdInput.length == 12
+                                            ) {
+                                                Icon(Icons.Default.Check, null)
+                                            }
+                                        }
+                                        lookupError?.let { err ->
+                                            Text(err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+
+                                    // ── Paso 3: Billetera confirmada — monto y motivo ──
+                                    val lookup = walletLookupResult
+                                    if (lookup != null) {
                                         Card(
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)),
                                             shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Row(
-                                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                modifier = Modifier.fillMaxWidth().padding(10.dp),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f), modifier = Modifier.size(34.dp)) {
                                                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                                            Icon(Icons.Default.AccountBalanceWallet, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(18.dp))
                                                         }
                                                     }
                                                     Column {
-                                                        Text(selectedRecipientUser!!.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                                        Text(selectedRecipientUser!!.email, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Text(lookup.wallet.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                                        Text("${lookup.wallet.currencyCode} · # ${lookup.wallet.accountId}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                     }
                                                 }
                                                 IconButton(onClick = {
-                                                    selectedRecipientUser = null
-                                                    selectedUserWallets = emptyList()
-                                                    selectedUserWallet = null
-                                                    userSearchQuery = ""
+                                                    walletLookupResult = null
+                                                    accountIdInput = ""
+                                                    lookupError = null
                                                 }, modifier = Modifier.size(28.dp)) {
                                                     Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
                                                 }
                                             }
                                         }
 
-                                        // Billeteras del destinatario
-                                        if (isLoadingUserWallets) {
-                                            Box(Modifier.fillMaxWidth().padding(4.dp), contentAlignment = Alignment.Center) {
-                                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                            }
-                                        } else if (selectedUserWallets.isNotEmpty()) {
-                                            Text("Billetera destino:", style = MaterialTheme.typography.labelLarge)
-                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                items(selectedUserWallets, key = { it.id }) { wallet ->
-                                                    val flag = currencies.find { c -> c.first == wallet.currencyCode }?.second?.take(2) ?: "💰"
-                                                    FilterChip(
-                                                        selected = selectedUserWallet?.id == wallet.id,
-                                                        onClick = {
-                                                            selectedUserWallet = wallet
-                                                            val cf = extFromWallet ?: fromWallet
-                                                            if (cf != null) viewModel.fetchExchangeRatePreview(cf.currencyCode, wallet.currencyCode)
-                                                        },
-                                                        label = { Text("$flag ${wallet.name} (${wallet.currencyCode})\n# ${wallet.accountId}") }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // Preview conversión inter-usuario
+                                        // Preview conversión
                                         val cf = extFromWallet ?: fromWallet
-                                        if (selectedUserWallet != null && cf != null && cf.currencyCode != selectedUserWallet!!.currencyCode) {
+                                        if (cf != null && cf.currencyCode != lookup.wallet.currencyCode) {
                                             if (uiState.isExchangeLoading) {
                                                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                                                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
@@ -1111,18 +1237,17 @@ fun DashboardScreen(
                                             } else {
                                                 val rate = uiState.exchangeRatePreview
                                                 if (rate != null) {
-                                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f))) {
+                                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f))) {
                                                         Column(modifier = Modifier.padding(12.dp)) {
                                                             Text("Tipo de cambio:", style = MaterialTheme.typography.labelSmall)
                                                             Text(
-                                                                "1 ${cf.currencyCode} = ${String.format("%.4f", rate)} ${selectedUserWallet!!.currencyCode}",
-                                                                style = MaterialTheme.typography.bodySmall,
-                                                                fontWeight = FontWeight.Bold
+                                                                "1 ${cf.currencyCode} = ${String.format("%.4f", rate)} ${lookup.wallet.currencyCode}",
+                                                                style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold
                                                             )
                                                             val amt = transferAmount.toDoubleOrNull() ?: 0.0
                                                             if (amt > 0) {
                                                                 Text(
-                                                                    "Destinatario recibirá: ${viewModel.getCurrencySymbol(selectedUserWallet!!.currencyCode)} ${String.format("%.2f", amt * rate)}",
+                                                                    "Destinatario recibirá: ${viewModel.getCurrencySymbol(lookup.wallet.currencyCode)} ${String.format("%.2f", amt * rate)}",
                                                                     style = MaterialTheme.typography.bodyMedium,
                                                                     color = MaterialTheme.colorScheme.primary
                                                                 )
@@ -1133,7 +1258,6 @@ fun DashboardScreen(
                                             }
                                         }
 
-                                        // Monto y motivo
                                         OutlinedTextField(
                                             value = transferAmount,
                                             onValueChange = {
@@ -1161,46 +1285,6 @@ fun DashboardScreen(
                                             singleLine = true
                                         )
                                     }
-                                    uiState.userSearchResults.isNotEmpty() -> {
-                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            uiState.userSearchResults.take(5).forEach { user ->
-                                                Surface(
-                                                    onClick = {
-                                                        selectedRecipientUser = user
-                                                        isLoadingUserWallets = true
-                                                        viewModel.getUserWallets(user.email) { wallets ->
-                                                            selectedUserWallets = wallets
-                                                            isLoadingUserWallets = false
-                                                        }
-                                                        viewModel.clearUserSearch()
-                                                    },
-                                                    shape = RoundedCornerShape(10.dp),
-                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                                ) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                                    ) {
-                                                        Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                                        Column {
-                                                            Text(user.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                                            Text(user.email, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    userSearchQuery.length >= 2 && !uiState.isSearchingUsers -> {
-                                        Text(
-                                            "No se encontraron usuarios con \"$userSearchQuery\"",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
                                 }
                             }
 
@@ -1224,15 +1308,13 @@ fun DashboardScreen(
                                     } else {
                                         val amt = transferAmount.toDoubleOrNull()
                                         val currentFrom = extFromWallet ?: fromWallet
-                                        val toUser = selectedRecipientUser
-                                        val toWallet = selectedUserWallet
+                                        val lookup = walletLookupResult
                                         when {
-                                            toUser == null -> viewModel.setError("Selecciona un destinatario usando el buscador")
-                                            toWallet == null -> viewModel.setError("Selecciona la billetera destino del destinatario")
+                                            lookup == null -> viewModel.setError("Busca y confirma la billetera destinataria por número de cuenta")
                                             currentFrom == null -> viewModel.setError("Selecciona una billetera de origen")
                                             amt == null || amt <= 0 -> viewModel.setError("Ingresa un monto válido")
                                             amt > currentFrom.balance -> viewModel.setError("Saldo insuficiente en ${currentFrom.name}")
-                                            else -> viewModel.transferToUser(currentFrom, toUser.email, toWallet, amt, extMotivo) { resetAndClose() }
+                                            else -> viewModel.transferToUser(currentFrom, lookup.ownerEmail, lookup.wallet, amt, extMotivo) { resetAndClose() }
                                         }
                                     }
                                 },

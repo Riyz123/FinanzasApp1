@@ -42,6 +42,12 @@ data class UserSearchResult(
     val displayName: String = ""
 )
 
+data class WalletLookupResult(
+    val ownerEmail: String = "",
+    val ownerName: String = "",
+    val wallet: Wallet = Wallet()
+)
+
 data class FinanceState(
     val balance: Double = 0.0,
     val transactions: List<Transaction> = emptyList(),
@@ -191,7 +197,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                         it.origin != "Ajuste de Moneda"
             }
             3 -> baseList.filter {
-                it.type == TransactionType.TRANSFER
+                it.origin == "Transferencia" || it.origin == "Transferencia Externa" || it.type == TransactionType.TRANSFER
             }
             4 -> baseList.filter {
                 it.origin == "Ajuste de Moneda"
@@ -561,12 +567,14 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                         }
                         val typeStr = when {
                             isConversion                       -> "Conversión"
+                            tx.origin == "Transferencia" || tx.origin == "Transferencia Externa" -> "Transfer."
                             tx.type == TransactionType.INCOME  -> "Ingreso"
                             tx.type == TransactionType.EXPENSE -> "Gasto"
                             else                               -> "Transfer."
                         }
                         val pfx = when {
-                            isConversion || tx.type == TransactionType.TRANSFER -> ""
+                            isConversion || tx.type == TransactionType.TRANSFER
+                                || tx.origin == "Transferencia" || tx.origin == "Transferencia Externa" -> ""
                             tx.type == TransactionType.INCOME  -> "+"
                             else                               -> "-"
                         }
@@ -640,12 +648,14 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     val isConversion = tx.origin == "Ajuste de Moneda"
                     val typeStr = when {
                         isConversion                       -> "Conversión"
+                        tx.origin == "Transferencia" || tx.origin == "Transferencia Externa" -> "Transferencia"
                         tx.type == TransactionType.INCOME  -> "Ingreso"
                         tx.type == TransactionType.EXPENSE -> "Gasto"
                         else                               -> "Transferencia"
                     }
                     val sign = when {
-                        isConversion || tx.type == TransactionType.TRANSFER -> ""
+                        isConversion || tx.type == TransactionType.TRANSFER
+                            || tx.origin == "Transferencia" || tx.origin == "Transferencia Externa" -> ""
                         tx.type == TransactionType.INCOME  -> "+"
                         else                               -> "-"
                     }
@@ -706,7 +716,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 balance = wallet.balance
             )
         }
-        calculateGlobalBalance()
+        // No llama a calculateGlobalBalance(): cambiar de billetera no altera
+        // ningún saldo, el total global no cambia. Llamarla causaba isLoading=true
+        // que destruía toda la composición (pantalla blanca).
         calculateChartTotals()
         applyFilters()
     }
@@ -722,9 +734,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         val targetCurrency = state.preferredCurrency
         if (wallets.isEmpty()) return
 
+        // Cálculo silencioso en segundo plano — no toca isLoading para no bloquear la UI
         viewModelScope.launch {
             try {
-                _uiState.update { it.copy(isLoading = true) }
                 var rates: Map<String, Double> = emptyMap()
                 try {
                     val response = withTimeout(5000) { currencyService.getCurrencyRate(targetCurrency) }
@@ -737,7 +749,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     val cachedJson = userPreferences.cachedRates.first()
                     if (cachedJson != null) rates = gson.fromJson(cachedJson, Map::class.java) as Map<String, Double>
                 }
-                
+
                 var total = 0.0
                 for (wallet in wallets) {
                     if (wallet.currencyCode == targetCurrency) {
@@ -752,10 +764,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                         total += if (rateToTarget != 0.0) wallet.balance / rateToTarget else wallet.balance
                     }
                 }
-                _uiState.update { it.copy(globalBalance = total, isLoading = false) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false) }
-            }
+                _uiState.update { it.copy(globalBalance = total) }
+            } catch (_: Exception) {}
         }
     }
 
@@ -790,7 +800,15 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     when (tx.type) {
                         TransactionType.INCOME -> income += tx.amount
                         TransactionType.EXPENSE -> expense += tx.amount
-                        TransactionType.TRANSFER -> {}
+                        TransactionType.TRANSFER -> {
+                            // Legacy TRANSFER records: determine direction by description
+                            val desc = tx.description.lowercase()
+                            if (desc.startsWith("de ") || desc.startsWith("transferencia de ")) {
+                                income += tx.amount
+                            } else {
+                                expense += tx.amount
+                            }
+                        }
                     }
                 }
                 _uiState.update { it.copy(chartIncome = income, chartExpense = expense, convertedTransactions = convertedTransactions) }
@@ -1265,8 +1283,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 val convertedAmount = amount * conversionRate
-                val expenseTrans = Transaction(amount = amount, currencyCode = fromWallet.currencyCode, description = "A ${toWallet.name}", origin = "Transferencia", type = TransactionType.TRANSFER, walletId = fromWallet.id)
-                val incomeTrans = Transaction(amount = convertedAmount, currencyCode = toWallet.currencyCode, description = "De ${fromWallet.name}", origin = "Transferencia", type = TransactionType.TRANSFER, walletId = toWallet.id)
+                val expenseTrans = Transaction(amount = amount, currencyCode = fromWallet.currencyCode, description = "A ${toWallet.name}", origin = "Transferencia", type = TransactionType.EXPENSE, walletId = fromWallet.id)
+                val incomeTrans = Transaction(amount = convertedAmount, currencyCode = toWallet.currencyCode, description = "De ${fromWallet.name}", origin = "Transferencia", type = TransactionType.INCOME, walletId = toWallet.id)
 
                 db.runBatch { batch ->
                     val userRef = db.collection("users").document(email)
@@ -1308,7 +1326,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             currencyCode = fromWallet.currencyCode,
             description = "A ${contact.recipientName}",
             origin = "Transferencia Externa",
-            type = TransactionType.TRANSFER,
+            type = TransactionType.EXPENSE,
             walletId = fromWallet.id,
             timestamp = timestamp,
             transferContact = contact
@@ -1529,6 +1547,44 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         _uiState.update { it.copy(userSearchResults = emptyList(), isSearchingUsers = false) }
     }
 
+    fun findWalletByAccountId(
+        accountId: String,
+        onResult: (WalletLookupResult) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val snap = db.collectionGroup("wallets")
+                    .whereEqualTo("accountId", accountId)
+                    .get().await()
+                if (snap.isEmpty) {
+                    onError("No se encontró ninguna billetera con ese número de cuenta.")
+                    return@launch
+                }
+                val doc = snap.documents.first()
+                val wallet = doc.toObject(Wallet::class.java) ?: run {
+                    onError("Error al leer la billetera.")
+                    return@launch
+                }
+                val ownerEmail = doc.reference.parent.parent?.id ?: run {
+                    onError("No se pudo identificar al titular.")
+                    return@launch
+                }
+                val currentEmail = uiState.value.currentUser?.email ?: ""
+                if (ownerEmail == currentEmail) {
+                    onError("No puedes transferir a tu propia billetera por este medio.")
+                    return@launch
+                }
+                val userDoc = db.collection("users").document(ownerEmail).get().await()
+                val name = "${userDoc.getString("name") ?: ""} ${userDoc.getString("lastname") ?: ""}".trim()
+                val ownerName = name.ifBlank { ownerEmail }
+                onResult(WalletLookupResult(ownerEmail = ownerEmail, ownerName = ownerName, wallet = wallet))
+            } catch (e: Exception) {
+                onError("Error al buscar la billetera: ${e.localizedMessage}")
+            }
+        }
+    }
+
     fun getUserWallets(email: String, onResult: (List<Wallet>) -> Unit) {
         viewModelScope.launch {
             try {
@@ -1575,13 +1631,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 val expenseTrans = Transaction(
                     amount = amount, currencyCode = fromWallet.currencyCode,
                     description = senderDesc, origin = "Transferencia",
-                    type = TransactionType.TRANSFER, walletId = fromWallet.id,
+                    type = TransactionType.EXPENSE, walletId = fromWallet.id,
                     transferContact = TransferContact(recipientName = toEmail, recipientAlias = toWallet.accountId, bank = "", motivo = motivo)
                 )
                 val incomeTrans = Transaction(
                     amount = convertedAmount, currencyCode = toWallet.currencyCode,
                     description = receiverDesc, origin = "Transferencia",
-                    type = TransactionType.TRANSFER, walletId = toWallet.id
+                    type = TransactionType.INCOME, walletId = toWallet.id
                 )
                 val newFromBalance = fromWallet.balance - amount
                 val newToBalance = toWallet.balance + convertedAmount
