@@ -106,6 +106,8 @@ fun FinanceApp(financeViewModel: FinanceViewModel) {
                 viewModel = financeViewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToBudgets = { navController.navigate("budgets") }
+
+
             )
         }
         composable("budgets") {

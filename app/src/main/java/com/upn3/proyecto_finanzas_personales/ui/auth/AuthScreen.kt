@@ -146,15 +146,17 @@ fun AuthScreen(
                 Text("INICIAR SESIÓN", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
             }
 
-            TextButton(onClick = onNavigateToRegister) {
+            TextButton(onNavigateToRegister) {
                 Text(
-                    text = "¿No tienes cuenta? REGÍSTRATE",
-                    style = MaterialTheme.typography.labelMedium,
+                    text="¿No tienes una cuenta? Regístrate",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
 
             Spacer(modifier = Modifier.height(100.dp)) // Espacio al final para centrar el contenido más arriba
+
+
         }
     }
 }
