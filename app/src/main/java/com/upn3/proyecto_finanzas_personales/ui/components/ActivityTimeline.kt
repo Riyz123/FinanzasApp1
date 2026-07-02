@@ -79,6 +79,8 @@ private fun resolveEvent(log: AuditLog): EventStyle = when (log.action) {
     AuditAction.UBICACION_REGISTRADA -> EventStyle(Icons.Default.LocationOn,    Color(0xFF00838F), "Ubicación registrada")
     AuditAction.UBICACION_ACTUALIZADA-> EventStyle(Icons.Default.EditLocation,  Color(0xFF0277BD), "Ubicación actualizada")
     AuditAction.UBICACION_ELIMINADA  -> EventStyle(Icons.Default.LocationOff,   Color(0xFF6D4C41), "Ubicación eliminada")
+    AuditAction.CATEGORIA_EDITADA    -> EventStyle(Icons.Default.Edit,          Color(0xFF00796B), "Categoría renombrada")
+    AuditAction.CATEGORIA_ELIMINADA  -> EventStyle(Icons.Default.Delete,        Color(0xFF6D4C41), "Categoría eliminada")
     else                             -> EventStyle(Icons.Default.Info,          Color(0xFF546E7A), log.action)
 }
 
@@ -114,6 +116,9 @@ private fun buildDetails(log: AuditLog): List<String> {
             field == "ConvertedAmount" -> "Monto recibido: $new"
             field == "ConversionRate" -> if (new != "1.0") "Tasa de conversión: $new" else null
             field == "Description" -> if (new.isNotBlank()) "Motivo: $new" else null
+            field == "categoría" && new.isEmpty() -> "Categoría eliminada: $old"
+            field == "categoría" && old.isEmpty() -> "Categoría: $new"
+            field == "categoría" -> "Categoría: $old → $new"
             old.isEmpty() -> "${field.replaceFirstChar { it.uppercase() }}: $new"
             new.isEmpty() -> "${field.replaceFirstChar { it.uppercase() }}: eliminado"
             else -> "${field.replaceFirstChar { it.uppercase() }}: $old → $new"

@@ -232,6 +232,23 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun changePassword(oldPass: String, newPass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        val currentUser = uiState.value.currentUser ?: return onError("Sesión no encontrada.")
+        viewModelScope.launch {
+            try {
+                if (oldPass != currentUser.password) { onError("La contraseña actual es incorrecta."); return@launch }
+                val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(currentUser.email, oldPass)
+                auth.currentUser?.reauthenticate(credential)?.await()
+                auth.currentUser?.updatePassword(newPass)?.await()
+                db.collection("users").document(currentUser.email).update("password", newPass).await()
+                _uiState.update { it.copy(currentUser = currentUser.copy(password = newPass)) }
+                onSuccess()
+            } catch (e: Exception) {
+                onError("Error al cambiar contraseña: ${e.localizedMessage}")
+            }
+        }
+    }
+
     fun updateUser(newName: String, newLastName: String, newEmail: String, newPass: String, newProfilePic: String, onSuccess: () -> Unit) {
         val currentUser = uiState.value.currentUser ?: return
         viewModelScope.launch {
@@ -999,13 +1016,48 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updateCategory(old: Category, new: Category) {
+        if (old.name == new.name && old.type == new.type) return
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                val updated = new.copy(id = old.id)
+                db.collection("users").document(email).collection("categories").document(updated.id).set(updated).await()
+                val idx = allCategories.indexOfFirst { it.id == old.id }
+                if (idx != -1) allCategories[idx] = updated
+                updateState()
+                if (old.name != new.name) {
+                    allTransactions.filter { it.origin == old.name }.forEach { tx ->
+                        addAuditLog(email, tx.id, AuditLog(
+                            transactionId = tx.id,
+                            action = AuditAction.CATEGORIA_EDITADA,
+                            userEmail = email,
+                            changedFields = mapOf("categoría" to mapOf("old" to old.name, "new" to new.name))
+                        ))
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
     fun deleteCategory(id: String) {
         val email = uiState.value.currentUser?.email ?: return
+        val category = allCategories.find { it.id == id }
         viewModelScope.launch {
             try {
                 db.collection("users").document(email).collection("categories").document(id).delete().await()
                 allCategories.removeAll { it.id == id }
                 updateState()
+                if (category != null) {
+                    allTransactions.filter { it.origin == category.name }.forEach { tx ->
+                        addAuditLog(email, tx.id, AuditLog(
+                            transactionId = tx.id,
+                            action = AuditAction.CATEGORIA_ELIMINADA,
+                            userEmail = email,
+                            changedFields = mapOf("categoría" to mapOf("old" to category.name, "new" to ""))
+                        ))
+                    }
+                }
             } catch (e: Exception) {}
         }
     }

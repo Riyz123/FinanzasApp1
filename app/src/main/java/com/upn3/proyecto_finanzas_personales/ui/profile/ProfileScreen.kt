@@ -41,7 +41,8 @@ import android.util.Log
 fun ProfileScreen(
     viewModel: FinanceViewModel,
     onNavigateBack: () -> Unit,
-    onNavigateToBudgets: () -> Unit = {}
+    onNavigateToBudgets: () -> Unit = {},
+    onNavigateToCategories: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val user = uiState.currentUser
@@ -49,8 +50,8 @@ fun ProfileScreen(
     var name by remember { mutableStateOf(user?.name ?: "") }
     var lastname by remember { mutableStateOf(user?.lastname ?: "") }
     var email by remember { mutableStateOf(user?.email ?: "") }
-    var password by remember { mutableStateOf("") }
     var profilePic by remember { mutableStateOf(user?.profilePicture ?: "") }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -112,7 +113,7 @@ fun ProfileScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = { viewModel.updateUser(name, lastname, email, password, profilePic) { onNavigateBack() } }) {
+                    TextButton(onClick = { viewModel.updateUser(name, lastname, email, "", profilePic) { onNavigateBack() } }) {
                         if (uiState.isLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
@@ -198,7 +199,27 @@ fun ProfileScreen(
 
                 // ── Seguridad ─────────────────────────────────────────────────
                 ProfileSection(title = "Seguridad", icon = Icons.Default.Lock) {
-                    SharedAuthTextField(value = password, onValueChange = { password = it }, label = "Nueva contraseña (dejar vacío para no cambiar)", icon = Icons.Default.Lock, isPassword = true)
+                    Surface(
+                        onClick = { showChangePasswordDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                Column {
+                                    Text("Cambiar Contraseña", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text("Requiere la contraseña actual", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
 
                 // ── Apariencia ────────────────────────────────────────────────
@@ -229,6 +250,27 @@ fun ProfileScreen(
                             Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    Surface(
+                        onClick = onNavigateToCategories,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.Category, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                Column {
+                                    Text("Gestión de Categorías", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text("Crear, editar y eliminar categorías", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
 
                 // ── Datos ─────────────────────────────────────────────────────
@@ -245,6 +287,107 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    // ── Dialog cambio de contraseña ────────────────────────────────────────
+    if (showChangePasswordDialog) {
+        var oldPass by remember { mutableStateOf("") }
+        var newPass by remember { mutableStateOf("") }
+        var repeatPass by remember { mutableStateOf("") }
+        var showOld by remember { mutableStateOf(false) }
+        var showNew by remember { mutableStateOf(false) }
+        var showRepeat by remember { mutableStateOf(false) }
+        var dialogError by remember { mutableStateOf<String?>(null) }
+        var isChanging by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { if (!isChanging) showChangePasswordDialog = false },
+            title = { Text("Cambiar Contraseña", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = oldPass,
+                        onValueChange = { oldPass = it; dialogError = null },
+                        label = { Text("Contraseña actual") },
+                        leadingIcon = { Icon(Icons.Default.Lock, null, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            IconButton(onClick = { showOld = !showOld }) {
+                                Icon(if (showOld) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        visualTransformation = if (showOld) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = newPass,
+                        onValueChange = { newPass = it; dialogError = null },
+                        label = { Text("Nueva contraseña") },
+                        leadingIcon = { Icon(Icons.Default.LockOpen, null, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            IconButton(onClick = { showNew = !showNew }) {
+                                Icon(if (showNew) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        visualTransformation = if (showNew) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = repeatPass,
+                        onValueChange = { repeatPass = it; dialogError = null },
+                        label = { Text("Repetir nueva contraseña") },
+                        leadingIcon = { Icon(Icons.Default.LockOpen, null, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            IconButton(onClick = { showRepeat = !showRepeat }) {
+                                Icon(if (showRepeat) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        visualTransformation = if (showRepeat) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        isError = repeatPass.isNotBlank() && repeatPass != newPass
+                    )
+                    if (repeatPass.isNotBlank() && repeatPass != newPass) {
+                        Text("Las contraseñas no coinciden", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    }
+                    dialogError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        when {
+                            oldPass.isBlank() -> dialogError = "Ingresa tu contraseña actual."
+                            newPass.length < 6 -> dialogError = "La nueva contraseña debe tener al menos 6 caracteres."
+                            newPass != repeatPass -> dialogError = "Las contraseñas no coinciden."
+                            else -> {
+                                isChanging = true
+                                viewModel.changePassword(
+                                    oldPass, newPass,
+                                    onSuccess = { showChangePasswordDialog = false },
+                                    onError = { dialogError = it; isChanging = false }
+                                )
+                            }
+                        }
+                    },
+                    enabled = !isChanging
+                ) {
+                    if (isChanging) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    else Text("Cambiar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showChangePasswordDialog = false }, enabled = !isChanging) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 

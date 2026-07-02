@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +31,7 @@ fun CategoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingCategory by remember { mutableStateOf<Category?>(null) }
     var newCategoryName by remember { mutableStateOf("") }
     var newCategoryType by remember { mutableStateOf(TransactionType.EXPENSE) }
 
@@ -45,7 +47,11 @@ fun CategoryScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = {
+                newCategoryName = ""
+                newCategoryType = TransactionType.EXPENSE
+                showAddDialog = true
+            }) {
                 Icon(Icons.Default.Add, contentDescription = "Nueva Categoría")
             }
         }
@@ -59,19 +65,22 @@ fun CategoryScreen(
             Text("Ingresos", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             CategoryList(
                 categories = uiState.categories.filter { it.type == TransactionType.INCOME },
-                onDelete = { viewModel.deleteCategory(it.id) }
+                onDelete = { viewModel.deleteCategory(it.id) },
+                onEdit = { editingCategory = it }
             )
-            
+
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             Text("Gastos", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
             CategoryList(
                 categories = uiState.categories.filter { it.type == TransactionType.EXPENSE },
-                onDelete = { viewModel.deleteCategory(it.id) }
+                onDelete = { viewModel.deleteCategory(it.id) },
+                onEdit = { editingCategory = it }
             )
         }
     }
 
+    // ── Diálogo agregar ────────────────────────────────────────────────────
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -82,7 +91,8 @@ fun CategoryScreen(
                         value = newCategoryName,
                         onValueChange = { newCategoryName = it },
                         label = { Text("Nombre") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(
@@ -117,10 +127,64 @@ fun CategoryScreen(
             }
         )
     }
+
+    // ── Diálogo editar ─────────────────────────────────────────────────────
+    editingCategory?.let { cat ->
+        var editName by remember(cat.id) { mutableStateOf(cat.name) }
+        var editType by remember(cat.id) { mutableStateOf(cat.type) }
+
+        AlertDialog(
+            onDismissRequest = { editingCategory = null },
+            title = { Text("Editar Categoría") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Nombre") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = editType == TransactionType.INCOME,
+                            onClick = { editType = TransactionType.INCOME }
+                        )
+                        Text("Ingreso")
+                        Spacer(modifier = Modifier.width(16.dp))
+                        RadioButton(
+                            selected = editType == TransactionType.EXPENSE,
+                            onClick = { editType = TransactionType.EXPENSE }
+                        )
+                        Text("Gasto")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (editName.isNotBlank()) {
+                        viewModel.updateCategory(cat, cat.copy(name = editName.trim(), type = editType))
+                        editingCategory = null
+                    }
+                }) {
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingCategory = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun CategoryList(categories: List<Category>, onDelete: (Category) -> Unit) {
+fun CategoryList(
+    categories: List<Category>,
+    onDelete: (Category) -> Unit,
+    onEdit: (Category) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         shape = RoundedCornerShape(12.dp)
@@ -133,8 +197,13 @@ fun CategoryList(categories: List<Category>, onDelete: (Category) -> Unit) {
                     ListItem(
                         headlineContent = { Text(category.name) },
                         trailingContent = {
-                            IconButton(onClick = { onDelete(category) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                            Row {
+                                IconButton(onClick = { onEdit(category) }) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                IconButton(onClick = { onDelete(category) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     )

@@ -78,9 +78,6 @@ fun DashboardScreen(
     onNavigateToReports: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showEditBalanceDialog by remember { mutableStateOf(false) }
-    var newBalanceText by remember { mutableStateOf("") }
-    
     var showEditTransactionDialog by remember { mutableStateOf(false) }
     var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
     var selectedConversion by remember { mutableStateOf<Transaction?>(null) }
@@ -365,11 +362,6 @@ fun DashboardScreen(
                                     overrideColor = walletPalette[page % walletPalette.size],
                                     currencySymbol = viewModel.getCurrencySymbol(wallet.currencyCode),
                                     onEditClick = { editingWallet = wallet; showEditWalletDialog = true },
-                                    onBalanceEditClick = {
-                                        newBalanceText = wallet.balance.toString()
-                                        showEditBalanceDialog = true
-                                        viewModel.clearError()
-                                    },
                                     onSelect = { viewModel.selectWallet(wallet) },
                                     isSelected = wallet.id == uiState.selectedWallet?.id,
                                     isLightTheme = uiState.selectedTheme == AppTheme.LIGHT,
@@ -1386,102 +1378,6 @@ fun DashboardScreen(
         }
     }
 
-    if (showEditBalanceDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditBalanceDialog = false },
-            title = { 
-                Text(
-                    "GESTIÓN DE BÓVEDA", 
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                ) 
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        "Ingrese el nuevo saldo deseado y elija cómo aplicarlo.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    OutlinedTextField(
-                        value = newBalanceText,
-                        onValueChange = { 
-                            val sanitized = it.replace(",", ".")
-                            if (sanitized.isEmpty() || sanitized.toDoubleOrNull() != null) {
-                                if (!sanitized.contains(".") || sanitized.substringAfter(".").length <= 2) {
-                                    newBalanceText = sanitized
-                                    viewModel.clearError()
-                                }
-                            }
-                        },
-                        label = { Text("Nuevo Saldo (${viewModel.getCurrencySymbol(uiState.selectedWallet?.currencyCode ?: "PEN")})") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                        ),
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    
-                    if (uiState.errorMessage != null) {
-                        Text(
-                            uiState.errorMessage!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = {
-                                val balance = newBalanceText.toDoubleOrNull()
-                                if (balance != null && balance >= 0) {
-                                    viewModel.adjustBalance(balance)
-                                    showEditBalanceDialog = false
-                                } else {
-                                    viewModel.setError("Ingrese un monto válido")
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("AJUSTAR SALDO")
-                        }
-                        
-                        OutlinedButton(
-                            onClick = {
-                                val balance = newBalanceText.toDoubleOrNull()
-                                if (balance != null && balance >= 0) {
-                                    viewModel.resetTransactions(balance)
-                                    showEditBalanceDialog = false
-                                } else {
-                                    viewModel.setError("Ingrese un monto válido")
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("REINICIAR BÓVEDA (BORRAR HISTORIAL)")
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showEditBalanceDialog = false }) {
-                    Text("CANCELAR", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        )
-    }
-
     if (showConversionDialog && selectedConversion != null) {
         ConversionDetailDialog(
             transaction = selectedConversion!!,
@@ -2277,7 +2173,6 @@ private fun WalletHeroCard(
     overrideColor: Long? = null,
     currencySymbol: String,
     onEditClick: () -> Unit,
-    onBalanceEditClick: () -> Unit,
     onSelect: () -> Unit,
     isSelected: Boolean = false,
     isLightTheme: Boolean = false,
@@ -2337,9 +2232,6 @@ private fun WalletHeroCard(
                         }
                     }
                     Row {
-                        IconButton(onClick = onBalanceEditClick, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(16.dp))
-                        }
                         IconButton(onClick = onEditClick, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Default.Settings, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(16.dp))
                         }
