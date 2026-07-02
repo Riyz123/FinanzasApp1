@@ -719,7 +719,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     _uiState.update { it.copy(errorMessage = "Perfil de usuario no encontrado") }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = "Error al iniciar sesión: ${e.message}") }
+                val msg = when (e) {
+                    is com.google.firebase.auth.FirebaseAuthInvalidUserException,
+                    is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException ->
+                        "Correo o contraseña incorrecta."
+                    else -> "Error al iniciar sesión: ${e.message}"
+                }
+                _uiState.update { it.copy(errorMessage = msg) }
             }
         }
     }
