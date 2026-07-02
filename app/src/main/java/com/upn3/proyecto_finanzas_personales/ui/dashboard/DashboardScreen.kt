@@ -138,6 +138,15 @@ fun DashboardScreen(
         Pair("BRL", "🇧🇷 Real Brasileño")
     )
 
+    val walletPalette: List<Long> = when (uiState.selectedTheme) {
+        AppTheme.DEFAULT -> listOf(0xFF22C55E, 0xFF059669, 0xFF0D9488, 0xFF16A34A, 0xFF0891B2, 0xFF65A30D)
+        AppTheme.OCEAN   -> listOf(0xFF0077B6, 0xFF0096C7, 0xFF0369A1, 0xFF0EA5E9, 0xFF0E7490, 0xFF1D4ED8)
+        AppTheme.GOLD    -> listOf(0xFFD97706, 0xFFB45309, 0xFFEA580C, 0xFFF59E0B, 0xFF92400E, 0xFFDC2626)
+        AppTheme.PURPLE  -> listOf(0xFF7C3AED, 0xFF6D28D9, 0xFF9333EA, 0xFF4F46E5, 0xFF7E22CE, 0xFF6366F1)
+        AppTheme.ROSE    -> listOf(0xFFC2185B, 0xFFBE185D, 0xFFDB2777, 0xFFE11D48, 0xFF9D174D, 0xFFB91C1C)
+        AppTheme.LIGHT   -> listOf(0xFF006D32, 0xFF166534, 0xFF15803D, 0xFF0F766E, 0xFF1D4ED8, 0xFF7C3AED)
+    }
+
     val currentUser = uiState.currentUser
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -353,6 +362,7 @@ fun DashboardScreen(
                                 val wallet = uiState.wallets[page]
                                 WalletHeroCard(
                                     wallet = wallet,
+                                    overrideColor = walletPalette[page % walletPalette.size],
                                     currencySymbol = viewModel.getCurrencySymbol(wallet.currencyCode),
                                     onEditClick = { editingWallet = wallet; showEditWalletDialog = true },
                                     onBalanceEditClick = {
@@ -542,7 +552,6 @@ fun DashboardScreen(
     }
 
     if (showGlobalBalanceDialog) {
-        var expandedCurrency by remember { mutableStateOf(false) }
         val lastUpdateText = if (uiState.lastRatesUpdate > 0) {
             val sdf = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
             "Actualizado: ${sdf.format(java.util.Date(uiState.lastRatesUpdate))}"
@@ -550,92 +559,130 @@ fun DashboardScreen(
             "Cargando tasas..."
         }
 
-        AlertDialog(
-            onDismissRequest = { showGlobalBalanceDialog = false },
-            title = { Text("Resumen Global", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Total combinado:", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            lastUpdateText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                    
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                        )
+        Dialog(onDismissRequest = { showGlobalBalanceDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    // ── Header con gradiente y balance ──────────────────────────
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                            )
+                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            Text(
+                                "Resumen Global",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f)
+                            )
                             Text(
                                 "${viewModel.getCurrencySymbol(uiState.preferredCurrency)} ${String.format("%.2f", uiState.globalBalance)}",
                                 style = MaterialTheme.typography.displaySmall,
                                 fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Text(
+                                lastUpdateText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f)
                             )
                         }
                     }
 
-                    Box {
-                        OutlinedTextField(
-                            value = currencies.find { it.first == uiState.preferredCurrency }?.second ?: uiState.preferredCurrency,
-                            onValueChange = { },
-                            readOnly = true,
-                            label = { Text("Convertir a") },
-                            modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = {
-                                IconButton(onClick = { expandedCurrency = true }) {
-                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                                }
-                            }
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // ── Selector de moneda como chips ───────────────────────
+                        Text(
+                            "Convertir a",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        DropdownMenu(
-                            expanded = expandedCurrency,
-                            onDismissRequest = { expandedCurrency = false }
-                        ) {
-                            currencies.forEach { currency ->
-                                DropdownMenuItem(
-                                    text = { Text(currency.second) },
-                                    onClick = {
-                                        viewModel.setPreferredCurrency(currency.first)
-                                        expandedCurrency = false
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(currencies) { currency ->
+                                val flag = currency.second.split(" ").first()
+                                FilterChip(
+                                    selected = currency.first == uiState.preferredCurrency,
+                                    onClick = { viewModel.setPreferredCurrency(currency.first) },
+                                    label = {
+                                        Text(
+                                            "$flag ${currency.first}",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
                                     }
                                 )
                             }
                         }
-                    }
 
-                    HorizontalDivider()
-                    
-                    Text("Desglose por billetera:", style = MaterialTheme.typography.labelLarge)
-                    uiState.wallets.forEach { wallet ->
-                        Row(
+                        HorizontalDivider()
+
+                        // ── Desglose por billetera ──────────────────────────────
+                        Text(
+                            "Desglose por billetera",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            uiState.wallets.forEachIndexed { index, wallet ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .background(Color(walletPalette[index % walletPalette.size]), CircleShape)
+                                        )
+                                        Text(wallet.name, style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                    Text(
+                                        "${viewModel.getCurrencySymbol(wallet.currencyCode)} ${String.format("%.2f", wallet.balance)}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        // ── Botón cerrar ────────────────────────────────────────
+                        Button(
+                            onClick = { showGlobalBalanceDialog = false },
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text(wallet.name, style = MaterialTheme.typography.bodySmall)
-                            Text("${viewModel.getCurrencySymbol(wallet.currencyCode)} ${String.format("%.2f", wallet.balance)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            Text("Cerrar")
                         }
                     }
                 }
-            },
-            confirmButton = {
-                Button(onClick = { showGlobalBalanceDialog = false }) {
-                    Text("Cerrar")
-                }
             }
-        )
+        }
     }
 
     if (showAddWalletDialog) {
@@ -691,9 +738,11 @@ fun DashboardScreen(
             confirmButton = {
                 Button(onClick = {
                     if (walletName.isNotBlank()) {
+                        val nextWalletColor = walletPalette[uiState.wallets.size % walletPalette.size]
                         viewModel.createWallet(com.upn3.proyecto_finanzas_personales.model.Wallet(
                             name = walletName,
-                            currencyCode = selectedCurrency.first
+                            currencyCode = selectedCurrency.first,
+                            color = nextWalletColor
                         ))
                         showAddWalletDialog = false
                     }
@@ -2225,6 +2274,7 @@ private fun dashboardGreeting(): String {
 @Composable
 private fun WalletHeroCard(
     wallet: com.upn3.proyecto_finanzas_personales.model.Wallet,
+    overrideColor: Long? = null,
     currencySymbol: String,
     onEditClick: () -> Unit,
     onBalanceEditClick: () -> Unit,
@@ -2237,10 +2287,11 @@ private fun WalletHeroCard(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val baseColor = Color(wallet.color)
-    val darkColor = remember(wallet.color) {
+    val resolvedColor = overrideColor ?: wallet.color
+    val baseColor = Color(resolvedColor)
+    val darkColor = remember(resolvedColor) {
         val hsv = FloatArray(3)
-        android.graphics.Color.colorToHSV(wallet.color.toInt(), hsv)
+        android.graphics.Color.colorToHSV(resolvedColor.toInt(), hsv)
         hsv[2] = (hsv[2] * 0.55f).coerceIn(0f, 1f)
         Color(android.graphics.Color.HSVToColor(hsv))
     }
