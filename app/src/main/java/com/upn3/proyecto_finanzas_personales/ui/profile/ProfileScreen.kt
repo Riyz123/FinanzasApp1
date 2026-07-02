@@ -42,7 +42,8 @@ fun ProfileScreen(
     viewModel: FinanceViewModel,
     onNavigateBack: () -> Unit,
     onNavigateToBudgets: () -> Unit = {},
-    onNavigateToCategories: () -> Unit = {}
+    onNavigateToCategories: () -> Unit = {},
+    onNavigateToNotas: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val user = uiState.currentUser
@@ -129,7 +130,6 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── Avatar header ─────────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -190,14 +190,12 @@ fun ProfileScreen(
 
             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
-                // ── Información personal ──────────────────────────────────────
                 ProfileSection(title = "Información Personal", icon = Icons.Default.Person) {
                     SharedAuthTextField(value = name, onValueChange = { name = it }, label = "Nombre", icon = Icons.Default.Badge)
                     SharedAuthTextField(value = lastname, onValueChange = { lastname = it }, label = "Apellidos", icon = Icons.Default.Badge)
                     SharedAuthTextField(value = email, onValueChange = { email = it }, label = "Correo Electrónico", icon = Icons.Default.Email)
                 }
 
-                // ── Seguridad ─────────────────────────────────────────────────
                 ProfileSection(title = "Seguridad", icon = Icons.Default.Lock) {
                     Surface(
                         onClick = { showChangePasswordDialog = true },
@@ -222,12 +220,10 @@ fun ProfileScreen(
                     }
                 }
 
-                // ── Apariencia ────────────────────────────────────────────────
                 ProfileSection(title = "Apariencia", icon = Icons.Default.Palette) {
                     ThemeSelector(currentTheme = uiState.selectedTheme, onThemeSelected = { viewModel.selectTheme(it) }, showLabel = false)
                 }
 
-                // ── Planificación ─────────────────────────────────────────────
                 ProfileSection(title = "Planificación Financiera", icon = Icons.Default.AccountBalance) {
                     Surface(
                         onClick = onNavigateToBudgets,
@@ -273,7 +269,30 @@ fun ProfileScreen(
                     }
                 }
 
-                // ── Datos ─────────────────────────────────────────────────────
+                ProfileSection(title = "Notas", icon = Icons.Default.Notes) {
+                    Surface(
+                        onClick = onNavigateToNotas,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.Notes, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                Column {
+                                    Text("Mis Notas", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text("Apuntes y recordatorios financieros", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
                 ProfileSection(title = "Datos y Copia de Seguridad", icon = Icons.Default.Backup) {
                     CsvDataManagement(viewModel)
                 }
@@ -289,7 +308,6 @@ fun ProfileScreen(
         }
     }
 
-    // ── Dialog cambio de contraseña ────────────────────────────────────────
     if (showChangePasswordDialog) {
         var oldPass by remember { mutableStateOf("") }
         var newPass by remember { mutableStateOf("") }
@@ -419,7 +437,6 @@ fun CsvDataManagement(viewModel: FinanceViewModel) {
     var importPasswordInput by remember { mutableStateOf("") }
     var showImportPassword by remember { mutableStateOf(false) }
 
-    // Mostrar resultado del export/import como snackbar visual
     var resultMessage by remember { mutableStateOf<String?>(null) }
     var resultIsError by remember { mutableStateOf(false) }
 
@@ -524,7 +541,6 @@ fun CsvDataManagement(viewModel: FinanceViewModel) {
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
-        // ── Resultado (éxito o error) ────────────────────────────────────────
         if (resultMessage != null) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -556,7 +572,6 @@ fun CsvDataManagement(viewModel: FinanceViewModel) {
             }
         }
 
-        // ── Qué se incluye en el backup ──────────────────────────────────────
         Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Contenido del backup", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -567,7 +582,6 @@ fun CsvDataManagement(viewModel: FinanceViewModel) {
             }
         }
 
-        // ── Cifrado ──────────────────────────────────────────────────────────
         Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
@@ -623,7 +637,6 @@ fun CsvDataManagement(viewModel: FinanceViewModel) {
             }
         }
 
-        // ── Botones ──────────────────────────────────────────────────────────
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(
                 onClick = {

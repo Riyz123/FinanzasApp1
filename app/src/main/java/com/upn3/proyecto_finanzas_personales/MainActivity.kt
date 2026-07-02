@@ -106,7 +106,14 @@ fun FinanceApp(financeViewModel: FinanceViewModel) {
                 viewModel = financeViewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToBudgets = { navController.navigate("budgets") },
-                onNavigateToCategories = { navController.navigate("categories") }
+                onNavigateToCategories = { navController.navigate("categories") },
+                onNavigateToNotas = { navController.navigate("notas") }
+            )
+        }
+        composable("notas") {
+            com.upn3.proyecto_finanzas_personales.ui.notas.NotasScreen(
+                viewModel = financeViewModel,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
         composable("budgets") {

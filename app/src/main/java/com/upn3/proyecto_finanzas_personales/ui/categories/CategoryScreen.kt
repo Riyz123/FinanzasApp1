@@ -80,7 +80,6 @@ fun CategoryScreen(
         }
     }
 
-    // ── Diálogo agregar ────────────────────────────────────────────────────
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -128,7 +127,6 @@ fun CategoryScreen(
         )
     }
 
-    // ── Diálogo editar ─────────────────────────────────────────────────────
     editingCategory?.let { cat ->
         var editName by remember(cat.id) { mutableStateOf(cat.name) }
         var editType by remember(cat.id) { mutableStateOf(cat.type) }

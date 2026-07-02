@@ -77,7 +77,8 @@ data class FinanceState(
     val isLoadingBudgets: Boolean = false,
     val allWalletTransactions: List<Transaction> = emptyList(),
     val userSearchResults: List<UserSearchResult> = emptyList(),
-    val isSearchingUsers: Boolean = false
+    val isSearchingUsers: Boolean = false,
+    val notas: List<com.upn3.proyecto_finanzas_personales.model.Nota> = emptyList()
 )
 
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
@@ -713,6 +714,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                         loadWallets()
                         loadTransactions()
                         loadCategories()
+                        loadNotas()
                         onSuccess()
                     }
                 } else {
@@ -1065,6 +1067,49 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
             } catch (e: Exception) {}
+        }
+    }
+
+    // ── Notas ─────────────────────────────────────────────────────────────
+    fun loadNotas() {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                val snap = db.collection("users").document(email).collection("notas").get().await()
+                val list = snap.toObjects(com.upn3.proyecto_finanzas_personales.model.Nota::class.java)
+                    .sortedByDescending { it.timestamp }
+                _uiState.update { it.copy(notas = list) }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun addNota(nota: com.upn3.proyecto_finanzas_personales.model.Nota) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("notas").document(nota.id).set(nota).await()
+                _uiState.update { it.copy(notas = listOf(nota) + it.notas) }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun updateNota(nota: com.upn3.proyecto_finanzas_personales.model.Nota) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("notas").document(nota.id).set(nota).await()
+                _uiState.update { it.copy(notas = it.notas.map { n -> if (n.id == nota.id) nota else n }) }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun deleteNota(id: String) {
+        val email = uiState.value.currentUser?.email ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(email).collection("notas").document(id).delete().await()
+                _uiState.update { it.copy(notas = it.notas.filter { n -> n.id != id }) }
+            } catch (_: Exception) {}
         }
     }
 
