@@ -821,7 +821,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 val snapshot = db.collection("users").document(email).collection("wallets").get().await()
-                val wallets = snapshot.toObjects(Wallet::class.java)
+                // Read accountId directly from each Firestore document to bypass the Kotlin default
+                // parameter (generateAccountId()) which would produce a fresh random ID every
+                // deserialization when the field is absent in Firestore.
+                val wallets = snapshot.documents.mapNotNull { doc ->
+                    val w = doc.toObject(Wallet::class.java) ?: return@mapNotNull null
+                    w.copy(accountId = doc.getString("accountId") ?: "")
+                }
                 allWallets.clear()
                 allWallets.addAll(wallets)
                 // Migrate wallets missing accountId
@@ -1589,7 +1595,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 val snap = db.collection("users").document(email).collection("wallets").get().await()
-                onResult(snap.toObjects(Wallet::class.java))
+                val wallets = snap.documents.mapNotNull { doc ->
+                    val w = doc.toObject(Wallet::class.java) ?: return@mapNotNull null
+                    w.copy(accountId = doc.getString("accountId") ?: "")
+                }
+                onResult(wallets)
             } catch (e: Exception) {
                 onResult(emptyList())
             }
@@ -1642,14 +1652,14 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 val newFromBalance = fromWallet.balance - amount
                 val newToBalance = toWallet.balance + convertedAmount
                 val traceFields = mapOf(
-                    "fromUser" to mapOf("value" to email),
-                    "toUser" to mapOf("value" to toEmail),
-                    "fromWallet" to mapOf("value" to "${fromWallet.name} (#${fromWallet.accountId})"),
-                    "toWallet" to mapOf("value" to "${toWallet.name} (#${toWallet.accountId})"),
-                    "originalAmount" to mapOf("value" to "$amount ${fromWallet.currencyCode}"),
-                    "convertedAmount" to mapOf("value" to "$convertedAmount ${toWallet.currencyCode}"),
-                    "conversionRate" to mapOf("value" to conversionRate.toString()),
-                    "description" to mapOf("value" to motivo)
+                    "FromUser" to mapOf("old" to "", "new" to email),
+                    "ToUser" to mapOf("old" to "", "new" to toEmail),
+                    "FromWallet" to mapOf("old" to "", "new" to "${fromWallet.name} (#${fromWallet.accountId})"),
+                    "ToWallet" to mapOf("old" to "", "new" to "${toWallet.name} (#${toWallet.accountId})"),
+                    "OriginalAmount" to mapOf("old" to "", "new" to "$amount ${fromWallet.currencyCode}"),
+                    "ConvertedAmount" to mapOf("old" to "", "new" to "$convertedAmount ${toWallet.currencyCode}"),
+                    "ConversionRate" to mapOf("old" to "", "new" to conversionRate.toString()),
+                    "Description" to mapOf("old" to "", "new" to motivo)
                 )
                 db.runBatch { batch ->
                     val senderRef = db.collection("users").document(email)

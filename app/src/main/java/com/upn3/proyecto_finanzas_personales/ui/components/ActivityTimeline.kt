@@ -106,6 +106,16 @@ private fun buildDetails(log: AuditLog): List<String> {
             field == "ubicación" && old.isEmpty() -> "Ubicación capturada"
             field == "ubicación" && new.isEmpty() -> "Ubicación eliminada"
             field == "ubicación" -> "Ubicación actualizada"
+            field == "FromUser" -> "Remitente: $new"
+            field == "ToUser" -> "Destinatario: $new"
+            field == "FromWallet" -> "Billetera origen: $new"
+            field == "ToWallet" -> "Billetera destino: $new"
+            field == "OriginalAmount" -> "Monto enviado: $new"
+            field == "ConvertedAmount" -> "Monto recibido: $new"
+            field == "ConversionRate" -> if (new != "1.0") "Tasa de conversión: $new" else null
+            field == "Description" -> if (new.isNotBlank()) "Motivo: $new" else null
+            old.isEmpty() -> "${field.replaceFirstChar { it.uppercase() }}: $new"
+            new.isEmpty() -> "${field.replaceFirstChar { it.uppercase() }}: eliminado"
             else -> "${field.replaceFirstChar { it.uppercase() }}: $old → $new"
         }
     }
