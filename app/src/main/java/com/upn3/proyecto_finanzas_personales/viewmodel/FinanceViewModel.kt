@@ -1,5 +1,6 @@
 package com.upn3.proyecto_finanzas_personales.viewmodel
 
+import android.R
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -1083,6 +1084,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+
     fun addNota(nota: com.upn3.proyecto_finanzas_personales.model.Nota) {
         val email = uiState.value.currentUser?.email ?: return
         viewModelScope.launch {
@@ -1092,6 +1094,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             } catch (_: Exception) {}
         }
     }
+
+
 
     fun updateNota(nota: com.upn3.proyecto_finanzas_personales.model.Nota) {
         val email = uiState.value.currentUser?.email ?: return
@@ -1103,6 +1107,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+
     fun deleteNota(id: String) {
         val email = uiState.value.currentUser?.email ?: return
         viewModelScope.launch {
@@ -1112,6 +1117,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             } catch (_: Exception) {}
         }
     }
+
 
     private fun addAuditLog(email: String, transactionId: String, log: AuditLog) {
         viewModelScope.launch {
